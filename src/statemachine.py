@@ -18,12 +18,22 @@ from io import BytesIO
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from common import aws  # noqa: E402
+from iam_setup import ensure_role, ROLES as IAM_ROLES  # noqa: E402
 
 LAMBDAS_DIR = Path(__file__).resolve().parent / "lambdas"
 ASL_DIR = Path(__file__).resolve().parents[1] / "asl"
-ROLE_ARN = "arn:aws:iam::000000000000:role/dummy-role"
+
+# Role per function/machine, least-privilege (see iam/*.json + scripts/iam_setup.py).
+# MiniStack doesn't enforce these on live calls, but they're real roles with
+# real policies attached — not a placeholder ARN.
+FUNCTION_ROLES = {
+    "txn-preflight": "arn:aws:iam::000000000000:role/txn-preflight-role",
+    "txn-record-status": "arn:aws:iam::000000000000:role/txn-record-status-role",
+}
+SFN_ROLE_ARN = "arn:aws:iam::000000000000:role/txn-sfn-execution-role"
 
 FUNCTIONS = {
     "txn-preflight": "preflight.py",
@@ -42,6 +52,11 @@ def _zip_handler(file_name: str) -> bytes:
     return buf.getvalue()
 
 
+def deploy_iam_roles(iam) -> None:
+    for role_name, (trust_file, policy_file) in IAM_ROLES.items():
+        ensure_role(iam, role_name, trust_file, policy_file)
+
+
 def deploy_lambdas(lam) -> None:
     for fn_name, file_name in FUNCTIONS.items():
         zip_bytes = _zip_handler(file_name)
@@ -52,7 +67,7 @@ def deploy_lambdas(lam) -> None:
             print(f"  updated Lambda: {fn_name}")
         else:
             lam.create_function(
-                FunctionName=fn_name, Runtime="python3.12", Role=ROLE_ARN,
+                FunctionName=fn_name, Runtime="python3.12", Role=FUNCTION_ROLES[fn_name],
                 Handler=handler, Code={"ZipFile": zip_bytes},
             )
             print(f"  created Lambda: {fn_name}")
@@ -79,7 +94,7 @@ def deploy_state_machines(sfn) -> dict:
             arns[sm_name] = existing[sm_name]
             print(f"  updated state machine: {sm_name}")
         else:
-            resp = sfn.create_state_machine(name=sm_name, definition=definition, roleArn=ROLE_ARN)
+            resp = sfn.create_state_machine(name=sm_name, definition=definition, roleArn=SFN_ROLE_ARN)
             arns[sm_name] = resp["stateMachineArn"]
             print(f"  created state machine: {sm_name}")
     return arns
@@ -97,9 +112,12 @@ def run_execution(sfn, state_machine_arn: str, input_dict: dict, timeout_s: floa
 
 
 def run_daily_job() -> dict:
+    iam = aws.client("iam")
     lam = aws.client("lambda")
     sfn = aws.client("stepfunctions")
 
+    print("Deploying IAM roles:")
+    deploy_iam_roles(iam)
     print("Deploying Lambdas:")
     deploy_lambdas(lam)
     print("Deploying state machines:")
@@ -151,8 +169,10 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.deploy_only:
+        iam = aws.client("iam")
         lam = aws.client("lambda")
         sfn = aws.client("stepfunctions")
+        deploy_iam_roles(iam)
         deploy_lambdas(lam)
         deploy_state_machines(sfn)
         return

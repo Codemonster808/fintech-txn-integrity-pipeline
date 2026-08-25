@@ -63,6 +63,8 @@ The idempotency gate is the hot path: short request, stateless, high QPS, one re
 |---|---|---|---|
 | S3 / SQS / SNS / Lambda / DynamoDB | [MiniStack](https://ministack.org) (free, MIT, no account) | AWS | High |
 | Step Functions | MiniStack (full ASL interpreter) | AWS | Medium-High |
+| AWS CLI v2 | Real `aws` CLI against MiniStack (`AWS_ENDPOINT_URL`, no `--endpoint-url` flag needed) — verified against all 7 services above | AWS CLI v2 | High — see `docs/RUNBOOK.md` §2 for the exact commands |
+| IAM | MiniStack accepts real roles/policies (`create-role`, `put-role-policy`, `assume-role`) and `iam simulate-principal-policy` evaluates them correctly — but does **not enforce** them on live S3/DynamoDB/Lambda calls (verified: a role with an explicit `Deny *` could still call `s3 ls`) | AWS IAM | Medium — real policy authoring/validation, no live enforcement; `docs/RUNBOOK.md` §5 has the `simulate-principal-policy` exercise |
 | Redshift | **DuckDB**, reading Parquet directly from S3 (`httpfs`) — same access pattern as Redshift `COPY`/Spectrum | Redshift Serverless | Medium — no MPP distribution; real `DISTKEY`/`SORTKEY` DDL shipped in `sql/redshift/` for reference |
 
 All AWS access goes through `boto3` with `endpoint_url` set via `AWS_ENDPOINT_URL` (see `common/aws.py`) — swapping MiniStack for `moto` or real AWS is a one-line change, not a rewrite.
@@ -76,10 +78,16 @@ All AWS access goes through `boto3` with `endpoint_url` set via `AWS_ENDPOINT_UR
 ## Demo (3 minutes)
 
 ```bash
-make demo   # docker-compose up + replay 100k synthetic events with injected duplicates
+source env.sh
+make demo        # 200 events — learn / iterate (see docs/RUNBOOK.md)
+make demo-full   # 100k events — regenerates README-scale metrics (~1h)
 pytest tests/test_idempotency.py
-make query  # daily settlement SQL against Redshift — shows zero double charges
+make query
 ```
+
+## Learn by running
+
+See [`docs/RUNBOOK.md`](docs/RUNBOOK.md) (step-by-step + what to inspect + what to break). Build from scratch: [`docs/BUILD_GUIDE.md`](docs/BUILD_GUIDE.md).
 
 ## What this is NOT
 

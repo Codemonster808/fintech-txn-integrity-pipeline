@@ -4,7 +4,7 @@ services:
     ports:
       - "4566:4566"
     environment:
-      - SERVICES=s3,sns,sqs,lambda,dynamodb,stepfunctions
+      - SERVICES=s3,sns,sqs,lambda,dynamodb,stepfunctions,iam,sts
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4566/health"]
       interval: 5s

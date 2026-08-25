@@ -1,34 +1,46 @@
-.PHONY: demo test e2e bench query check-env build-gate curate
+SHELL := /bin/bash
+.PHONY: demo demo-full test e2e bench query check-env build-gate curate inspect
+
+ENV := set -a && source ./env.sh --quiet && set +a
+
+DEMO_COUNT ?= 200
+DEMO_FULL_COUNT ?= 100000
 
 check-env:
-	python3 scripts/check_env.py
+	$(ENV) && python3 scripts/check_env.py
 
 build-gate:
 	cd src/gate && go build ./...
 
+inspect:
+	$(ENV) && python3 scripts/aws_inspect.py all
+
+# Small scale — for learning. Gate is always cleaned up (Problem 2).
 demo: build-gate
-	docker compose up -d
-	python3 scripts/bootstrap.py
-	python3 src/data_gen.py --out data/events.jsonl --count 100000 --retry-rate 0.08
-	GIN_MODE=release src/gate/gate & sleep 1; \
-	python3 src/publisher.py --in data/events.jsonl && \
-	python3 src/consumer.py --idle-timeout 10 && \
-	python3 src/statemachine.py
+	$(ENV) && docker compose up -d
+	$(ENV) && python3 scripts/bootstrap.py
+	$(ENV) && python3 src/data_gen.py --out data/events.jsonl --count $(DEMO_COUNT) --retry-rate 0.08
+	$(ENV) && bash scripts/run_with_bg.sh 8080 'GIN_MODE=release src/gate/gate' -- \
+		bash -c 'python3 src/publisher.py --in data/events.jsonl && python3 src/consumer.py --idle-timeout 10 && python3 src/statemachine.py'
+
+# README-scale. Regenerates published metrics. ~1h at 100k events.
+demo-full: build-gate
+	$(MAKE) demo DEMO_COUNT=$(DEMO_FULL_COUNT)
 
 test: build-gate
-	pytest tests/ -v --ignore=tests/test_e2e.py
+	$(ENV) && pytest tests/ -v --ignore=tests/test_e2e.py
 
 e2e: build-gate
-	pytest tests/test_e2e.py -v -s
+	$(ENV) && pytest tests/test_e2e.py -v -s
 
 bench:
-	python3 src/bench.py --out benchmarks/results.json
+	$(ENV) && python3 src/bench.py --out benchmarks/results.json
 
 query:
-	python3 -c "import sys; sys.path.insert(0,'src'); from common import warehouse; \
+	$(ENV) && python3 -c "import sys; sys.path.insert(0,'src'); from common import warehouse; \
 	con = warehouse.connect(); \
 	warehouse.read_parquet(con, 's3://txn-curated/txn_events/**/*.parquet', 'txn_curated'); \
 	print(con.execute(open('sql/daily_settlement.sql').read()).fetchall())"
 
 curate:
-	python3 src/curate.py
+	$(ENV) && python3 src/curate.py

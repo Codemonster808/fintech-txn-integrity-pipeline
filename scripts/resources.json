@@ -1,0 +1,7 @@
+{
+  "buckets": ["txn-raw", "txn-curated", "txn-quarantine"],
+  "queues": ["txn-validation-queue", "txn-audit-queue", "txn-audit-dlq"],
+  "tables": ["txn-idempotency", "txn-gate-metrics", "txn-curation-jobs"],
+  "topics": ["txn-events"],
+  "functions": ["txn-preflight", "txn-record-status"]
+}
