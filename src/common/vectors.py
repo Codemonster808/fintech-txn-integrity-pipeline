@@ -8,7 +8,7 @@ from typing import Protocol
 
 class VectorStore(Protocol):
     def upsert(self, ids: list[str], embeddings: list[list[float]], metadatas: list[dict]) -> None: ...
-    def query(self, embedding: list[float], top_k: int = 5) -> list[dict]: ...
+    def query(self, embedding: list[float], top_k: int = 5, where: dict | None = None) -> list[dict]: ...
 
 
 class ChromaVectorStore:
@@ -20,8 +20,15 @@ class ChromaVectorStore:
     def upsert(self, ids, embeddings, metadatas) -> None:
         self._collection.upsert(ids=ids, embeddings=embeddings, metadatas=metadatas)
 
-    def query(self, embedding, top_k: int = 5) -> list[dict]:
-        result = self._collection.query(query_embeddings=[embedding], n_results=top_k)
+    def query(self, embedding, top_k: int = 5, where: dict | None = None) -> list[dict]:
+        # `where` scopes the search to a metadata subset (e.g. one document's
+        # own chunks) BEFORE ranking — filtering top-k results after an
+        # unscoped global search is not equivalent when many similar
+        # documents are indexed together: a document's own best-matching
+        # chunk can rank outside the global top-k, silently starving that
+        # document's retrieval. Found by testing against 15 near-identical
+        # synthetic reports, where exactly this happened.
+        result = self._collection.query(query_embeddings=[embedding], n_results=top_k, where=where)
         return [
             {"id": id_, "metadata": meta, "distance": dist}
             for id_, meta, dist in zip(result["ids"][0], result["metadatas"][0], result["distances"][0])
@@ -39,8 +46,8 @@ class PineconeVectorStore:
     def upsert(self, ids, embeddings, metadatas) -> None:
         self._index.upsert(vectors=list(zip(ids, embeddings, metadatas)))
 
-    def query(self, embedding, top_k: int = 5) -> list[dict]:
-        result = self._index.query(vector=embedding, top_k=top_k, include_metadata=True)
+    def query(self, embedding, top_k: int = 5, where: dict | None = None) -> list[dict]:
+        result = self._index.query(vector=embedding, top_k=top_k, include_metadata=True, filter=where)
         return [{"id": m.id, "metadata": m.metadata, "distance": 1 - m.score} for m in result.matches]
 
 
