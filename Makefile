@@ -1,4 +1,4 @@
-.PHONY: demo test bench query check-env build-gate
+.PHONY: demo test e2e bench query check-env build-gate curate
 
 check-env:
 	python3 scripts/check_env.py
@@ -10,11 +10,16 @@ demo: build-gate
 	docker compose up -d
 	python3 scripts/bootstrap.py
 	python3 src/data_gen.py --out data/events.jsonl --count 100000 --retry-rate 0.08
-	@echo "Start the gate in another terminal: GIN_MODE=release src/gate/gate"
-	@echo "Then run: python3 src/replay.py --in data/events.jsonl (see BUILD_GUIDE step 3)"
+	GIN_MODE=release src/gate/gate & sleep 1; \
+	python3 src/publisher.py --in data/events.jsonl && \
+	python3 src/consumer.py --idle-timeout 10 && \
+	python3 src/statemachine.py
 
 test: build-gate
-	pytest tests/ -v
+	pytest tests/ -v --ignore=tests/test_e2e.py
+
+e2e: build-gate
+	pytest tests/test_e2e.py -v -s
 
 bench:
 	python3 src/bench.py --out benchmarks/results.json

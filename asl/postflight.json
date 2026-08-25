@@ -1,0 +1,27 @@
+{
+  "Comment": "Daily job post-flight: record completion after the PySpark curate step (run by src/statemachine.py between the two executions). Execution input must be {\"job_id\": \"<id>\", \"curated_row_count\": N, \"duplicates_dropped\": N}.",
+  "StartAt": "RecordCompleted",
+  "States": {
+    "RecordCompleted": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:000000000000:function:txn-record-status",
+      "Parameters": {
+        "job_id.$": "$.job_id",
+        "status": "completed",
+        "curated_row_count.$": "$.curated_row_count",
+        "duplicates_dropped.$": "$.duplicates_dropped"
+      },
+      "Retry": [
+        {"ErrorEquals": ["States.ALL"], "MaxAttempts": 3, "IntervalSeconds": 1, "BackoffRate": 2.0}
+      ],
+      "Catch": [
+        {"ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "PostflightFailed"}
+      ],
+      "End": true
+    },
+    "PostflightFailed": {
+      "Type": "Fail",
+      "Error": "PostflightRecordFailed"
+    }
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "pipeline": "fintech-txn-integrity-pipeline",
+  "generated_at": "2026-08-25T16:11:51.542169+00:00",
+  "score": {
+    "completeness": 1.0,
+    "correctness": 1.0,
+    "consistency": 1.0,
+    "validity": 1.0,
+    "timeliness": 1.0,
+    "overall": 1.0
+  },
+  "checks": [
+    {
+      "dimension": "completeness",
+      "name": "no_settled_txn_lost",
+      "measured": 920,
+      "threshold": 920,
+      "passed": true,
+      "detail": "S3 raw valid objects (920) vs unique idempotency keys generated (920)"
+    },
+    {
+      "dimension": "correctness",
+      "name": "dedup_rate_matches_injected",
+      "measured": 0.0,
+      "threshold": 0.02,
+      "passed": true,
+      "detail": "measured dedup rate 0.0800 vs injected 0.08"
+    },
+    {
+      "dimension": "correctness",
+      "name": "zero_processing_errors",
+      "measured": 0,
+      "threshold": 0,
+      "passed": true,
+      "detail": "consumer error count"
+    },
+    {
+      "dimension": "consistency",
+      "name": "curate_reprocess_same_row_count",
+      "measured": 1.0,
+      "threshold": 1.0,
+      "passed": true,
+      "detail": "first run rows_out=920, second run rows_out=920"
+    },
+    {
+      "dimension": "validity",
+      "name": "no_valid_events_misrouted_to_quarantine",
+      "measured": 0,
+      "threshold": 0,
+      "passed": true,
+      "detail": "all synthetic events use schema_version=1, so quarantine should be empty"
+    },
+    {
+      "dimension": "timeliness",
+      "name": "daily_job_under_sla",
+      "measured": 65.9,
+      "threshold": 120.0,
+      "passed": true,
+      "detail": "preflight + curate + postflight wall time"
+    },
+    {
+      "dimension": "timeliness",
+      "name": "consumer_throughput_under_sla",
+      "measured": 34.7,
+      "threshold": 45.0,
+      "passed": true,
+      "detail": "1000 events through gate+validator"
+    }
+  ]
+}

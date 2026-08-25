@@ -1,0 +1,45 @@
+{
+  "Comment": "Daily job pre-flight: check there's data to curate, record the start. Execution input must be {\"job_id\": \"<id>\"}.",
+  "StartAt": "CheckDataReady",
+  "States": {
+    "CheckDataReady": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:000000000000:function:txn-preflight",
+      "ResultPath": "$.preflight",
+      "Retry": [
+        {"ErrorEquals": ["States.ALL"], "MaxAttempts": 3, "IntervalSeconds": 1, "BackoffRate": 2.0}
+      ],
+      "Catch": [
+        {"ErrorEquals": ["States.ALL"], "ResultPath": "$.error", "Next": "PreflightFailed"}
+      ],
+      "Next": "IsDataReady"
+    },
+    "IsDataReady": {
+      "Type": "Choice",
+      "Choices": [
+        {"Variable": "$.preflight.ready_to_curate", "BooleanEquals": true, "Next": "RecordStarted"}
+      ],
+      "Default": "NoDataToCurate"
+    },
+    "RecordStarted": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:000000000000:function:txn-record-status",
+      "Parameters": {
+        "job_id.$": "$.job_id",
+        "status": "started",
+        "raw_object_count.$": "$.preflight.raw_object_count"
+      },
+      "Retry": [
+        {"ErrorEquals": ["States.ALL"], "MaxAttempts": 3, "IntervalSeconds": 1, "BackoffRate": 2.0}
+      ],
+      "End": true
+    },
+    "NoDataToCurate": {
+      "Type": "Succeed"
+    },
+    "PreflightFailed": {
+      "Type": "Fail",
+      "Error": "PreflightCheckFailed"
+    }
+  }
+}
