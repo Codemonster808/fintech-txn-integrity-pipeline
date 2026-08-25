@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pyspark>=4.0
+duckdb
+boto3
+pytest
+requests
+python-dotenv
+pydantic

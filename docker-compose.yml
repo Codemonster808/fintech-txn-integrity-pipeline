@@ -1,0 +1,12 @@
+services:
+  ministack:
+    image: ministackorg/ministack:latest
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3,sns,sqs,lambda,dynamodb,stepfunctions
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

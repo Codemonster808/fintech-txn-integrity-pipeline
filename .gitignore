@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.localstack/
+data/
+benchmarks/results.json
+target/
+*.class
+.env
+.DS_Store
+src/gate/gate
+src/gateway/gateway
+.chroma/
