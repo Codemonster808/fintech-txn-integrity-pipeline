@@ -74,6 +74,7 @@ All AWS access goes through `boto3` with `endpoint_url` set via `AWS_ENDPOINT_UR
 1. **Real exactly-once**: idempotency key + DynamoDB `ConditionExpression: attribute_not_exists`, including the edge case of a retry arriving after a partial commit.
 2. **Schema evolution**: `schema_version` embedded per event, registry in S3, explicit policy for new/removed fields, quarantine bucket with targeted replay.
 3. **Small-file compaction**: measured trade-off between file size and PUT/GET request count, with before/after Redshift query time.
+4. **Transactional outbox**: `record_status.py` commits the job-status row and a `PENDING` outbox row in one `transact_write_items` call — the business fact and the not-yet-published `CurationCompleted` event succeed or fail together. `src/outbox_publisher.py` is a separate, idempotent, safe-to-re-run process that actually publishes to SNS — publishing inline inside the Lambda would reintroduce the exact failure mode (a lost event after a committed write) the pattern exists to prevent. See `docs/RUNBOOK.md` §1.5 and §5.
 
 ## Demo (3 minutes)
 

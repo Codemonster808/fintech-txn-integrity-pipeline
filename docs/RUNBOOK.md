@@ -91,6 +91,18 @@ python3 src/curate.py          # Parquet en txn-curated
 make query                     # DuckDB (stand-in de Redshift)
 ```
 
+### 1.5 Outbox: publicar el evento de finalización
+
+`src/statemachine.py` ya dejó un evento `CurationCompleted` en `PENDING` dentro de `txn-outbox` (lo escribe `record_status.py` en la misma transacción DynamoDB que la fila de status — ver su docstring). Nadie lo publicó a SNS todavía:
+
+```bash
+aws dynamodb scan --table-name txn-outbox --query 'Items[*].[event_id.S,status.S]' --output text
+make outbox                    # o: python3 src/outbox_publisher.py
+aws dynamodb scan --table-name txn-outbox --query 'Items[*].[event_id.S,status.S]' --output text
+```
+
+**Qué entender:** `make outbox` no corre solo dentro de `make demo` — a propósito, para que veas el evento quedarse en `PENDING` hasta que alguien lo publique. Esa separación (escribir el hecho de negocio + el evento pendiente atómicamente, publicar después, en otro proceso) es el patrón *transactional outbox*: si `record_status.py` publicara a SNS directo después del `put_item`, un fallo justo ahí perdería el evento en silencio aunque el job quedara marcado `completed`. Ver el ejercicio de la sección 5 para romperlo a propósito.
+
 ---
 
 ## 2. Explorar con AWS CLI
@@ -110,6 +122,9 @@ aws sqs get-queue-attributes --queue-url "$QUEUE_URL" --attribute-names All
 # DynamoDB — item real, no el resumen compactado de aws_inspect.py
 aws dynamodb scan --table-name txn-idempotency --max-items 5
 aws dynamodb describe-table --table-name txn-gate-metrics --query 'Table.ItemCount'
+
+# Outbox — eventos pendientes de publicar y ya publicados
+aws dynamodb scan --table-name txn-outbox --query 'Items[*].[event_id.S,status.S]' --output text
 
 # SNS — suscripciones del topic (quién recibe cada evento)
 TOPIC_ARN=$(aws sns list-topics --query "Topics[?contains(TopicArn,'txn-events')].TopicArn" --output text)
@@ -241,6 +256,15 @@ aws iam simulate-principal-policy --policy-source-arn arn:aws:iam::000000000000:
 <details><summary>Verificar</summary>
 
 Paso 1 y 4: `EvalDecision: allowed`. Paso 3: `EvalDecision: implicitDeny` — sin ningún `Allow` explícito para `s3:ListBucket`, IAM real (y `simulate-principal-policy` en MiniStack, que sí lo evalúa) niega por defecto. Nota que un statement con `Statement: []` vacío falla con `MalformedPolicyDocument` — tanto MiniStack como AWS real exigen al menos un statement, por eso el paso 2 usa un permiso *distinto* (`s3:GetBucketLocation`) en vez de dejar la política vacía. Esta es exactamente la mecánica de "validar antes de desplegar" que usarías en el trabajo real, sin depender de que el emulador bloquee nada.
+</details>
+
+**6. Demuestra por qué el outbox existe: simula un evento "perdido" y recupéralo**
+
+Corre `python3 src/statemachine.py` dos veces seguidas (dos `job_id` distintos, dos eventos `PENDING` nuevos en `txn-outbox`) **sin** correr `make outbox` entre medio. Luego corre `make outbox` una sola vez.
+
+<details><summary>Verificar</summary>
+
+`aws dynamodb scan --table-name txn-outbox` antes de `make outbox` muestra 2 (o más) filas `PENDING` acumuladas — cada `statemachine.py` dejó su evento pendiente, y nada se perdió por no haberse publicado de inmediato. Un solo `make outbox` los publica todos y los marca `PUBLISHED` — confirmá con `aws sqs receive-message` sobre `txn-curation-events-queue` que llegaron los 2 mensajes. Compará esto contra el diseño ingenuo (publicar directo dentro de `record_status.py`): ahí, si el proceso Lambda muriera entre el `put_item` y el `sns.publish`, el job quedaría marcado `completed` en DynamoDB pero el evento jamás se publicaría — y no habría manera de saberlo sin comparar manualmente contra otra fuente. Con el outbox, la fila `PENDING` es justamente esa señal: nada queda "completado" sin que su evento esté, al menos, pendiente de publicar de forma visible.
 </details>
 
 ---

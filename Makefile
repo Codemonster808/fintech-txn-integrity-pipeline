@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: demo demo-full test e2e bench query check-env build-gate curate inspect
+.PHONY: demo demo-full test e2e bench query check-env build-gate curate inspect outbox
 
 ENV := set -a && source ./env.sh --quiet && set +a
 
@@ -14,6 +14,11 @@ build-gate:
 
 inspect:
 	$(ENV) && python3 scripts/aws_inspect.py all
+
+# Not run automatically by `demo` — the RUNBOOK exercise deliberately
+# lets PENDING outbox rows accumulate first so the pattern is visible.
+outbox:
+	$(ENV) && python3 src/outbox_publisher.py
 
 # Small scale — for learning. Gate is always cleaned up (Problem 2).
 demo: build-gate

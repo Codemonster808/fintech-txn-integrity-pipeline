@@ -14,6 +14,9 @@ DLQ_NAME = "txn-audit-dlq"
 IDEMPOTENCY_TABLE = "txn-idempotency"
 METRICS_TABLE = "txn-gate-metrics"
 JOBS_TABLE = "txn-curation-jobs"
+OUTBOX_TABLE = "txn-outbox"
+CURATION_EVENTS_TOPIC = "txn-curation-events"
+CURATION_EVENTS_QUEUE = "txn-curation-events-queue"
 BUCKETS = ["txn-raw", "txn-curated", "txn-quarantine"]
 
 
@@ -101,11 +104,18 @@ def main() -> None:
     ensure_subscription(sns, sqs, topic_arn, validation_url)
     ensure_subscription(sns, sqs, topic_arn, audit_url)
 
+    print("Outbox topic + subscription:")
+    curation_events_arn = ensure_topic(sns, CURATION_EVENTS_TOPIC)
+    print(f"  topic ready: {curation_events_arn}")
+    curation_queue_url = ensure_queue(sqs, CURATION_EVENTS_QUEUE)
+    ensure_subscription(sns, sqs, curation_events_arn, curation_queue_url)
+
     print("DynamoDB tables:")
     ddb = aws.client("dynamodb")
     ensure_table(ddb, IDEMPOTENCY_TABLE, "idempotency_key")
     ensure_table(ddb, METRICS_TABLE, "metric_id")
     ensure_table(ddb, JOBS_TABLE, "job_id")
+    ensure_table(ddb, OUTBOX_TABLE, "event_id")
 
     print("Bootstrap complete.")
 
