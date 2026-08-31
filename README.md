@@ -17,18 +17,42 @@ Exactly-once transaction ingestion pipeline for payment platforms, built to run 
 ## Architecture
 
 ```
-synthetic txn producer (deliberate retries/duplicates)
-  → SNS topic `txn-events`
-  → SQS fan-out: validation queue + audit queue (+ DLQ)
-  → Go/Gin idempotency gate: hash(idempotency_key) → DynamoDB conditional PutItem
-  → Lambda validator: schema version check → quarantine bucket on failure
-  → S3 raw (JSON, partitioned by ingest hour)
-  → Step Functions daily job: PySpark curate + Parquet compaction → S3 curated
-  → Redshift COPY from S3 curated
-  → FastAPI: /txn/{id} status, /metrics/dedup, /metrics/sla
+  data_gen.py  -->  events.jsonl (~8% retries)
+        |
+        v
+  publisher.py -->  SNS txn-events
+                      |
+           +----------+-----------+
+           v                      v
+  SQS validation           SQS audit --> DLQ
+           |
+           v
+  consumer.py ----POST /accept---->  Go gate :8080
+                                        |
+                          DynamoDB PutItem (idempotency_key)
+                                        |
+                              200 OK         409 duplicate
+                                |                  |
+                                v                  v
+                         validator            ACK, no S3 write
+                           |      |
+                        valid   invalid
+                           |      |
+                           v      v
+                      S3 txn-raw   S3 quarantine
+                           |
+                           v
+                    Step Functions (preflight -> Spark driver -> postflight)
+                           |
+                           v
+                    curate.py (PySpark compact) --> S3 txn-curated Parquet
+                           |
+                           v
+                    DuckDB / Redshift COPY --> FastAPI /txn /metrics
 ```
 
-See `docs/architecture.md` for the diagram.
+Hot path = gate (ms). Batch = Spark compaction (daily).  
+Full diagrams + notes: [`docs/architecture.md`](docs/architecture.md).
 
 ## Why Go here
 
