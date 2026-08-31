@@ -1,0 +1,106 @@
+{
+  "materialized": [
+    {
+      "scale_rows": 10000,
+      "status": "ok",
+      "input_bytes_estimate": 2370000,
+      "rows_before_dedup": 10000,
+      "rows_after_dedup": 9233,
+      "duplicates_dropped": 767,
+      "write_input_seconds": 10.806,
+      "dedup_and_write_output_seconds": 3.987,
+      "total_seconds": 14.792,
+      "rows_per_second_dedup_phase": 2508.2,
+      "shuffle_metrics": {
+        "shuffle_read_bytes": 956269,
+        "shuffle_write_bytes": 956269,
+        "disk_bytes_spilled": 0,
+        "memory_bytes_spilled": 0,
+        "n_stages": 9
+      }
+    },
+    {
+      "scale_rows": 100000,
+      "status": "ok",
+      "input_bytes_estimate": 23700000,
+      "rows_before_dedup": 100000,
+      "rows_after_dedup": 92502,
+      "duplicates_dropped": 7498,
+      "write_input_seconds": 2.25,
+      "dedup_and_write_output_seconds": 7.808,
+      "total_seconds": 10.058,
+      "rows_per_second_dedup_phase": 12806.9,
+      "shuffle_metrics": {
+        "shuffle_read_bytes": 9531845,
+        "shuffle_write_bytes": 9531845,
+        "disk_bytes_spilled": 0,
+        "memory_bytes_spilled": 0,
+        "n_stages": 9
+      }
+    },
+    {
+      "scale_rows": 1000000,
+      "status": "ok",
+      "input_bytes_estimate": 237000000,
+      "rows_before_dedup": 1000000,
+      "rows_after_dedup": 926281,
+      "duplicates_dropped": 73719,
+      "write_input_seconds": 24.385,
+      "dedup_and_write_output_seconds": 10.329,
+      "total_seconds": 34.713,
+      "rows_per_second_dedup_phase": 96818.3,
+      "shuffle_metrics": {
+        "shuffle_read_bytes": 95108699,
+        "shuffle_write_bytes": 95108699,
+        "disk_bytes_spilled": 0,
+        "memory_bytes_spilled": 0,
+        "n_stages": 9
+      }
+    },
+    {
+      "scale_rows": 10000000,
+      "status": "ok",
+      "input_bytes_estimate": 2370000000,
+      "rows_before_dedup": 10000000,
+      "rows_after_dedup": 9259431,
+      "duplicates_dropped": 740569,
+      "write_input_seconds": 370.472,
+      "dedup_and_write_output_seconds": 90.284,
+      "total_seconds": 460.756,
+      "rows_per_second_dedup_phase": 110761.3,
+      "shuffle_metrics": {
+        "shuffle_read_bytes": 970970972,
+        "shuffle_write_bytes": 970970972,
+        "disk_bytes_spilled": 0,
+        "memory_bytes_spilled": 0,
+        "n_stages": 9
+      }
+    }
+  ],
+  "logical": null,
+  "extrapolation_to_1tb": {
+    "assumptions": [
+      "linear scaling of the largest measured rows/second past the measured range",
+      "same single-machine hardware, no contention from other workloads",
+      "shuffle spill scales linearly with row count (no algorithmic change)"
+    ],
+    "based_on_scale_rows": 10000000,
+    "measured_rows_per_second": 110761.3,
+    "one_tb_rows": 4639289568,
+    "extrapolated_seconds_for_1tb_dedup_phase": 41885.5,
+    "extrapolated_time_for_1tb_dedup_phase_human": "11.6 hours",
+    "projected_shuffle_write_bytes_at_1tb": 450461550123,
+    "driver_memory_bytes": 2147483648,
+    "free_disk_bytes": 53687091200,
+    "model_breaks_down": true,
+    "model_breakdown_reason": "projected shuffle volume at 1 TB (419.5 GB) is 210x the 2 GB driver memory and exceeds free disk (50 GB) \u2014 at every measured scale (up to 10M rows) disk_bytes_spilled was 0 because shuffle data fit in driver memory; at 1 TB it would not, forcing spill, and there isn't enough disk for that spill either. This is not achievable on this machine at any speed \u2014 it would require a distributed shuffle across multiple nodes, not just more time on one.",
+    "gate_bottleneck_comparison": {
+      "source": "/home/lesaint/Documentos/life_plans/fintech-txn-integrity-pipeline/benchmarks/results.json",
+      "measured_p50_ms": 3.66,
+      "single_threaded_events_per_second": 273.2,
+      "extrapolated_seconds_for_1tb_through_gate": 16979799.8,
+      "extrapolated_time_for_1tb_through_gate_human": "196.5 days",
+      "note": "The gate is a single synchronous HTTP hop per event \u2014 at 1 TB row counts this is the real bottleneck, orders of magnitude below Spark's dedup throughput. Scaling this pipeline to TB volumes means batching the idempotency check, not tuning Spark."
+    }
+  }
+}

@@ -49,6 +49,22 @@ The idempotency gate is the hot path: short request, stateless, high QPS, one re
 
 > Numbers above are from actual runs against MiniStack + the real Go gate on this machine, not projected. `make bench` regenerates them.
 
+## Scale testing — measured curve, honest extrapolation, not a "TB-tested" claim
+
+A literal 1 TB run does not fit on the machine this was built on (measured 237-byte events → 1 TB = 4,639,289,568 rows; 50 GB free disk; a dedup-by-key shuffle at that volume needs on the order of 1 TB of shuffle spill). Rather than skip scale testing or overstate it, `make scale-bench` measures the real dedup/curate path at increasing row counts and extrapolates with the assumptions stated in the output — see `docs/scale-report.md` for the full report and `src/scale_bench.py` for the harness.
+
+| Rows | Status | Rows/s (dedup phase) | Shuffle spill |
+|---|---|---|---|
+| 10,000 | OK | 2,508/s | 0 MB |
+| 100,000 | OK | 12,807/s | 0 MB |
+| 1,000,000 | OK | 96,818/s | 0 MB |
+| 10,000,000 | OK | 110,761/s | 0 MB |
+
+- **Extrapolated time for 1 TB through this path: ~11.6 hours**, linearly from the 10M-row measurement — an assumption stated explicitly, not a measured number.
+- **The extrapolation itself breaks down before 1 TB**: projected shuffle volume at that scale (~420 GB) is 210× the Spark driver's 2 GB and exceeds the 50 GB free disk — the honest conclusion is that this specific machine cannot run this shuffle at 1 TB *at any speed*, not just slowly. Reaching that scale for real would need a distributed shuffle across multiple nodes.
+- **The real bottleneck isn't Spark.** The gate's own measured throughput (p50=3.66ms, single-threaded) is ~273 events/s — at 1 TB that's ~196 days through the gate alone, vs. ~12 hours for the Spark side on the same row count. Scaling this pipeline to TB volumes means batching the idempotency check, not tuning Spark.
+- `make scale-bench-logical` separately processes **1 billion rows (~221 GB logical, 21.6% of 1 TB) in ~5.7 minutes**, generated and consumed entirely in-flight via `spark.range()` — nothing written to disk. This demonstrates the no-shuffle path can reach genuinely large row counts fast; it is reported separately and never conflated with the materialized throughput above.
+
 ## Modeled business impact (synthetic data — assumptions documented)
 
 | Assumption | Source | Modeled outcome |

@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: demo demo-full test e2e bench query check-env build-gate curate inspect outbox
+.PHONY: demo demo-full test e2e bench query check-env build-gate curate inspect outbox scale-bench scale-bench-logical
 
 ENV := set -a && source ./env.sh --quiet && set +a
 
@@ -49,3 +49,16 @@ query:
 
 curate:
 	$(ENV) && python3 src/curate.py
+
+# Not part of demo/e2e — opt-in, ~10-15 min. Measures the real dedup/curate
+# path at increasing scale and extrapolates to 1 TB with explicit
+# assumptions (see docs/scale-report.md). A literal 1 TB run does not fit
+# on this machine (50 GB free disk) — see src/scale_bench.py's module
+# docstring for the numbers behind that.
+scale-bench:
+	$(ENV) && python3 src/scale_bench.py --mode materialized --scales 10000,100000,1000000,10000000
+
+# Billions of rows generated and consumed in-flight, nothing written to
+# disk — a different, honest kind of "large" than scale-bench's real I/O.
+scale-bench-logical:
+	$(ENV) && python3 src/scale_bench.py --mode logical --rows 2000000000

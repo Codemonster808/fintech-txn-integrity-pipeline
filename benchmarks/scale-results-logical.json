@@ -1,0 +1,12 @@
+{
+  "materialized": [],
+  "logical": {
+    "requested_rows": 1000000000,
+    "processed_rows": 999998027,
+    "logical_bytes_estimate": 236999532399,
+    "elapsed_seconds": 341.882,
+    "rows_per_second": 2924976.0,
+    "materialized_to_disk": false
+  },
+  "extrapolation_to_1tb": null
+}
