@@ -64,12 +64,13 @@ The idempotency gate is the hot path: short request, stateless, high QPS, one re
 
 | Metric | Value | How it's measured |
 |---|---|---|
-| Gate p95 latency (200 requests) | **4.11 ms** | `make bench` → `benchmarks/results.json` |
-| Gate mean latency | **3.69 ms** | `make bench` |
+| Gate p95 latency, single-threaded (200 requests) | **2.87 ms** | `make bench` → `benchmarks/results.json` |
+| Gate mean latency, single-threaded | **2.44 ms** | `make bench` |
+| Gate concurrent throughput (real capacity, not a serial caller's) | **~826 requests/s** at 16 concurrent workers | `make bench-gate-concurrent` → `benchmarks/gate-throughput.json`, see *Scale testing* below |
 | Duplicate rate (500 events, 10% injected retries) | **0.10** — matches injected rate exactly | `python3 src/bench.py` after a clean `data_gen.py` + gate replay |
 | Concurrent race on one key (20 simultaneous requests) | **1 accepted, 19 rejected**, every time | `pytest tests/test_chaos.py::test_concurrent_duplicate_requests_only_one_wins` |
 | Spark curate job | 191/191 rows preserved, 0 lost | `python3 src/curate.py` |
-| Test suite | **10/10 passing, re-runnable** (no hardcoded keys — see below) | `pytest tests/ -v`, run twice in a row |
+| Test suite | **12/12 passing, re-runnable** (no hardcoded keys — see below) | `pytest tests/ -v`, run twice in a row |
 
 > Numbers above are from actual runs against MiniStack + the real Go gate on this machine, not projected. `make bench` regenerates them.
 
@@ -88,6 +89,14 @@ A literal 1 TB run does not fit on the machine this was built on (measured 237-b
 - **The extrapolation itself breaks down before 1 TB**: projected shuffle volume at that scale (~420 GB) is 210× the Spark driver's 2 GB and exceeds the 50 GB free disk — the honest conclusion is that this specific machine cannot run this shuffle at 1 TB *at any speed*, not just slowly. Reaching that scale for real would need a distributed shuffle across multiple nodes.
 - **The real bottleneck isn't Spark.** The gate's own measured throughput (p50=3.66ms, single-threaded) is ~273 events/s — at 1 TB that's ~196 days through the gate alone, vs. ~12 hours for the Spark side on the same row count. Scaling this pipeline to TB volumes means batching the idempotency check, not tuning Spark.
 - `make scale-bench-logical` separately processes **1 billion rows (~221 GB logical, 21.6% of 1 TB) in ~5.7 minutes**, generated and consumed entirely in-flight via `spark.range()` — nothing written to disk. This demonstrates the no-shuffle path can reach genuinely large row counts fast; it is reported separately and never conflated with the materialized throughput above.
+
+### From "the model breaks before 1 TB" to code addressing both real bottlenecks — see `docs/scale-roadmap.md`
+
+Two structural changes, both implemented and measured, not just proposed:
+
+**`src/curate_incremental.py`** replaces the global shuffle with bounded batches checked against a persistent DynamoDB table (`txn-curated-keys`) — the same no-shuffle principle the real-time gate already uses. Measured over 6 consecutive 100K-row batches (`benchmarks/incremental-results.json`): the actual work (rows deduped, cross-batch duplicates caught) stayed **exactly flat** batch to batch — the property `curate.py`'s global shuffle lacks. Wall-clock time did **not** stay flat (35.7s → 140.9s over the run) — reported as measured, with the two candidate causes (Bloom filter fill dynamics; DynamoDB lookup cost on MiniStack possibly not O(1) in table size) stated as not yet isolated, not resolved into a single confident number. Two real bugs were found and fixed building this — see `docs/scale-roadmap.md` for both.
+
+**The gate's real bottleneck, measured for the first time.** The "~273 events/s" figure above is a *serial caller's* throughput — nobody had measured the gate's actual concurrent capacity before `bench_gate_saturation_curve()` (`src/bench.py`) existed. Changes made, in order: metrics moved off the request path (`sync/atomic` counters, periodic flush — cut 2-3 synchronous DynamoDB calls per request to 1), a bounded LRU cache serves confirmed-duplicate responses without touching DynamoDB (visible in `make e2e`'s own output: 409 responses answer in ~50µs instead of a full round-trip), and a new `POST /accept/batch` endpoint (`BatchGetItem`/`BatchWriteItem`, ~0.05 round-trips/event) trades `/accept`'s atomic guarantee for far higher throughput where at-least-once is acceptable — `/accept` itself is unchanged and `tests/test_chaos.py::test_concurrent_duplicate_requests_only_one_wins` still proves its exact-one-winner guarantee holds. See `benchmarks/gate-throughput.json` for the full concurrent saturation curve.
 
 ## Modeled business impact (synthetic data — assumptions documented)
 

@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: demo demo-full test e2e bench query check-env build-gate curate inspect outbox scale-bench scale-bench-logical
+.PHONY: demo demo-full test e2e bench bench-gate-concurrent query check-env build-gate curate curate-incremental inspect outbox scale-bench scale-bench-logical
 
 ENV := set -a && source ./env.sh --quiet && set +a
 
@@ -41,6 +41,14 @@ e2e: build-gate
 bench:
 	$(ENV) && python3 src/bench.py --out benchmarks/results.json
 
+# Requires the gate running on :8080 separately (make bench starts nothing
+# — same assumption src/bench.py's module docstring already states).
+# Measures REAL concurrent capacity, not a serial client's throughput —
+# see src/bench.py's bench_gate_throughput_concurrent docstring.
+bench-gate-concurrent:
+	$(ENV) && python3 src/bench.py --out benchmarks/results.json --concurrent \
+		--concurrent-out benchmarks/gate-throughput.json
+
 query:
 	$(ENV) && python3 -c "import sys; sys.path.insert(0,'src'); from common import warehouse; \
 	con = warehouse.connect(); \
@@ -49,6 +57,11 @@ query:
 
 curate:
 	$(ENV) && python3 src/curate.py
+
+# Not part of demo/e2e — opt-in. Bounded-footprint alternative to `curate`
+# for volumes too large to shuffle in one pass; see docs/scale-roadmap.md.
+curate-incremental:
+	$(ENV) && python3 src/curate_incremental.py --n-batches 10 --batch-rows 300000
 
 # Not part of demo/e2e — opt-in, ~10-15 min. Measures the real dedup/curate
 # path at increasing scale and extrapolates to 1 TB with explicit

@@ -15,6 +15,7 @@ IDEMPOTENCY_TABLE = "txn-idempotency"
 METRICS_TABLE = "txn-gate-metrics"
 JOBS_TABLE = "txn-curation-jobs"
 OUTBOX_TABLE = "txn-outbox"
+CURATED_KEYS_TABLE = "txn-curated-keys"
 CURATION_EVENTS_TOPIC = "txn-curation-events"
 CURATION_EVENTS_QUEUE = "txn-curation-events-queue"
 BUCKETS = ["txn-raw", "txn-curated", "txn-quarantine"]
@@ -116,6 +117,7 @@ def main() -> None:
     ensure_table(ddb, METRICS_TABLE, "metric_id")
     ensure_table(ddb, JOBS_TABLE, "job_id")
     ensure_table(ddb, OUTBOX_TABLE, "event_id")
+    ensure_table(ddb, CURATED_KEYS_TABLE, "idempotency_key")
 
     print("Bootstrap complete.")
 

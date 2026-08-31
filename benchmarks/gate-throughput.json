@@ -1,0 +1,54 @@
+{
+  "saturation_curve": [
+    {
+      "n_requests": 300,
+      "concurrency": 1,
+      "total_seconds": 0.737,
+      "throughput_rps": 407.0,
+      "p50_ms": 2.31,
+      "p95_ms": 2.58,
+      "n_200": 300,
+      "n_non_200": 0
+    },
+    {
+      "n_requests": 300,
+      "concurrency": 8,
+      "total_seconds": 0.366,
+      "throughput_rps": 819.8,
+      "p50_ms": 8.91,
+      "p95_ms": 12.81,
+      "n_200": 300,
+      "n_non_200": 0
+    },
+    {
+      "n_requests": 300,
+      "concurrency": 16,
+      "total_seconds": 0.363,
+      "throughput_rps": 825.8,
+      "p50_ms": 16.43,
+      "p95_ms": 23.79,
+      "n_200": 300,
+      "n_non_200": 0
+    },
+    {
+      "n_requests": 300,
+      "concurrency": 32,
+      "total_seconds": 0.374,
+      "throughput_rps": 801.6,
+      "p50_ms": 30.72,
+      "p95_ms": 48.46,
+      "n_200": 300,
+      "n_non_200": 0
+    },
+    {
+      "n_requests": 300,
+      "concurrency": 64,
+      "total_seconds": 0.402,
+      "throughput_rps": 746.2,
+      "p50_ms": 26.78,
+      "p95_ms": 65.7,
+      "n_200": 300,
+      "n_non_200": 0
+    }
+  ]
+}
