@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Idempotent creation of the AWS resources this repo needs, against MiniStack."""
+
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from common import aws  # noqa: E402
+from utils import aws  # noqa: E402
 
 TOPIC_NAME = "txn-events"
 VALIDATION_QUEUE = "txn-validation-queue"
@@ -30,10 +31,13 @@ def ensure_bucket(s3, name: str) -> None:
         print(f"  bucket already exists: {name}")
 
 
-def ensure_queue(sqs, name: str, redrive_to_arn: str | None = None, max_receive_count: int = 3) -> str:
+def ensure_queue(
+    sqs, name: str, redrive_to_arn: str | None = None, max_receive_count: int = 3
+) -> str:
     attributes = {}
     if redrive_to_arn:
         import json
+
         attributes["RedrivePolicy"] = json.dumps(
             {"deadLetterTargetArn": redrive_to_arn, "maxReceiveCount": str(max_receive_count)}
         )
@@ -59,13 +63,17 @@ def ensure_subscription(sns, sqs, topic_arn: str, queue_url: str) -> None:
     so consumers read the original event body directly instead of an
     SNS-wrapped envelope. Idempotent: SNS de-dupes identical subscriptions
     by (topic, protocol, endpoint)."""
-    queue_arn = sqs.get_queue_attributes(QueueUrl=queue_url, AttributeNames=["QueueArn"])["Attributes"]["QueueArn"]
+    queue_arn = sqs.get_queue_attributes(QueueUrl=queue_url, AttributeNames=["QueueArn"])[
+        "Attributes"
+    ]["QueueArn"]
     existing = sns.list_subscriptions_by_topic(TopicArn=topic_arn)["Subscriptions"]
     if any(s["Endpoint"] == queue_arn for s in existing):
         print(f"  subscription already exists: {queue_arn}")
         return
     resp = sns.subscribe(
-        TopicArn=topic_arn, Protocol="sqs", Endpoint=queue_arn,
+        TopicArn=topic_arn,
+        Protocol="sqs",
+        Endpoint=queue_arn,
         Attributes={"RawMessageDelivery": "true"},
     )
     print(f"  subscribed {queue_arn} -> {topic_arn} ({resp['SubscriptionArn']})")
@@ -94,7 +102,9 @@ def main() -> None:
     print("SQS queues:")
     sqs = aws.client("sqs")
     dlq_url = ensure_queue(sqs, DLQ_NAME)
-    dlq_arn = sqs.get_queue_attributes(QueueUrl=dlq_url, AttributeNames=["QueueArn"])["Attributes"]["QueueArn"]
+    dlq_arn = sqs.get_queue_attributes(QueueUrl=dlq_url, AttributeNames=["QueueArn"])["Attributes"][
+        "QueueArn"
+    ]
     validation_url = ensure_queue(sqs, VALIDATION_QUEUE, redrive_to_arn=dlq_arn)
     audit_url = ensure_queue(sqs, AUDIT_QUEUE, redrive_to_arn=dlq_arn)
 

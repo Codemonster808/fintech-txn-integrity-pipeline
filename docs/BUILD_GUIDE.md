@@ -45,7 +45,7 @@ make check-env   # should print: "OK: services reachable"
 **Troubleshooting**
 - Port 4566 already in use → another MiniStack/LocalStack instance is running; `docker ps` and stop it.
 - `check-env` times out → MiniStack takes a couple seconds to boot (much faster than LocalStack); wait and retry.
-- boto3 calls hang or hit real AWS → confirm `AWS_ENDPOINT_URL=http://localhost:4566` is set (see `.env` / `common/aws.py`).
+- boto3 calls hang or hit real AWS → confirm `AWS_ENDPOINT_URL=http://localhost:4566` is set (see `.env` / `utils/aws.py`).
 
 ## 2. Generate synthetic data (1-2 h) → checkpoint: `make check-data`
 
@@ -55,10 +55,10 @@ A transaction event looks like:
 {"txn_id": "uuid", "idempotency_key": "uuid", "account_id": "acc_123", "amount_cents": 4599, "currency": "USD", "schema_version": 1, "ts": "2026-01-01T12:00:00Z"}
 ```
 
-Write `src/data_gen.py` that produces 100k of these, with 8% deliberately re-sent (same `idempotency_key`, different `txn_id` timing) to simulate producer retries.
+Write `src/ingestion/data_gen.py` that produces 100k of these, with 8% deliberately re-sent (same `idempotency_key`, different `txn_id` timing) to simulate producer retries.
 
 ```bash
-python3 src/data_gen.py --out data/events.jsonl --count 100000 --retry-rate 0.08
+python3 src/ingestion/data_gen.py --out data/events.jsonl --count 100000 --retry-rate 0.08
 make check-data   # should print: "OK: 100000 events, 8.0% retries, schema valid"
 ```
 
@@ -67,7 +67,7 @@ make check-data   # should print: "OK: 100000 events, 8.0% retries, schema valid
 Build one piece at a time — do not write the whole path before testing the first hop.
 
 1. Create the SNS topic and SQS queues (+ DLQ) via `awslocal`. Verify: `awslocal sqs list-queues`.
-2. Write the Go/Gin idempotency gate (`src/gate/main.go`): receives an event, does a conditional `PutItem` on DynamoDB keyed by `idempotency_key`. Verify: send the same event twice, confirm the second gets HTTP 409.
+2. Write the Go/Gin idempotency gate (`src/ingestion/gate/main.go`): receives an event, does a conditional `PutItem` on DynamoDB keyed by `idempotency_key`. Verify: send the same event twice, confirm the second gets HTTP 409.
 3. Write the Lambda validator: checks `schema_version` against a registry file in S3; on mismatch, writes to the quarantine bucket instead of raw.
 
 ```bash
@@ -80,7 +80,7 @@ make check-ingest   # replays 1000 events through the full path, asserts 0 dupli
 
 ## 4. Build the compute/transform layer (4-6 h) → checkpoint: `make check-transform`
 
-Write the PySpark job (`src/curate.py`) that reads `S3RAW`, dedupes, and writes compacted Parquet to `S3CUR`, partitioned by day.
+Write the PySpark job (`src/transformation/curate.py`) that reads `S3RAW`, dedupes, and writes compacted Parquet to `S3CUR`, partitioned by day.
 
 ```bash
 make check-transform   # asserts file count in S3CUR is <10% of file count in S3RAW for the same day
@@ -88,7 +88,7 @@ make check-transform   # asserts file count in S3CUR is <10% of file count in S3
 
 ## 5. Build the serving layer + API (2-3 h) → checkpoint: `make check-api`
 
-Point DuckDB's `httpfs` extension at MiniStack's S3 endpoint and query `S3CUR` directly (`SELECT * FROM read_parquet('s3://txn-curated/**/*.parquet')`) — this is the local equivalent of a Redshift `COPY`. The real `DISTKEY`/`SORTKEY` DDL for an actual Redshift deployment lives in `sql/redshift/schema.sql` for reference. Write the FastAPI app (`src/api.py`) with `/txn/{id}`, `/metrics/dedup`, `/metrics/sla`.
+Point DuckDB's `httpfs` extension at MiniStack's S3 endpoint and query `S3CUR` directly (`SELECT * FROM read_parquet('s3://txn-curated/**/*.parquet')`) — this is the local equivalent of a Redshift `COPY`. The real `DISTKEY`/`SORTKEY` DDL for an actual Redshift deployment lives in `sql/redshift/schema.sql` for reference. Write the FastAPI app (`src/serving/api.py`) with `/txn/{id}`, `/metrics/dedup`, `/metrics/sla`.
 
 ```bash
 uvicorn src.api:app --reload

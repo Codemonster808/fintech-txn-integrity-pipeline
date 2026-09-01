@@ -15,6 +15,7 @@ Reads resource names from scripts/resources.json in this repo. A section
 only prints if this repo's resources.json declares that resource type —
 not every repo uses every service.
 """
+
 from __future__ import annotations
 
 import json
@@ -24,7 +25,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from common import aws  # noqa: E402
+from utils import aws  # noqa: E402
 
 CFG = json.loads((ROOT / "scripts" / "resources.json").read_text())
 
@@ -73,7 +74,11 @@ def inspect_sqs() -> None:
         try:
             url = sqs.get_queue_url(QueueName=name)["QueueUrl"]
             attrs = sqs.get_queue_attributes(
-                QueueUrl=url, AttributeNames=["ApproximateNumberOfMessages", "ApproximateNumberOfMessagesNotVisible"]
+                QueueUrl=url,
+                AttributeNames=[
+                    "ApproximateNumberOfMessages",
+                    "ApproximateNumberOfMessagesNotVisible",
+                ],
             )["Attributes"]
         except Exception as e:
             print(f"  {name}: ERROR {e}")
@@ -117,7 +122,9 @@ def inspect_lambda() -> None:
         except Exception as e:
             print(f"  {name}: not deployed yet ({e.__class__.__name__})")
             continue
-        print(f"  {name}: state={cfg['State']} runtime={cfg['Runtime']} last_modified={cfg['LastModified']}")
+        print(
+            f"  {name}: state={cfg['State']} runtime={cfg['Runtime']} last_modified={cfg['LastModified']}"
+        )
 
 
 def inspect_ecs() -> None:
@@ -149,11 +156,13 @@ def inspect_sfn() -> None:
         print(f"  ERROR {e}")
         return
     if not machines:
-        print("  (none deployed yet — run src/statemachine.py)")
+        print("  (none deployed yet — run src/orchestration/statemachine.py)")
         return
     for sm in machines:
         print(f"  {sm['name']}")
-        execs = sfn.list_executions(stateMachineArn=sm["stateMachineArn"], maxResults=5).get("executions", [])
+        execs = sfn.list_executions(stateMachineArn=sm["stateMachineArn"], maxResults=5).get(
+            "executions", []
+        )
         if not execs:
             print("      (no executions yet)")
         for ex in execs:
@@ -179,7 +188,10 @@ def main() -> None:
             print()
         return
     if what not in HANDLERS:
-        print(f"usage: python3 scripts/aws_inspect.py [{' | '.join(['all', *HANDLERS])}]", file=sys.stderr)
+        print(
+            f"usage: python3 scripts/aws_inspect.py [{' | '.join(['all', *HANDLERS])}]",
+            file=sys.stderr,
+        )
         sys.exit(2)
     HANDLERS[what]()
 

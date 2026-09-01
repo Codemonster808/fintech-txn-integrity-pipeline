@@ -2,7 +2,7 @@ services:
   ministack:
     image: ministackorg/ministack:latest
     ports:
-      - "4566:4566"
+      - "${MINISTACK_PORT:-4581}:4566"
     environment:
       - SERVICES=s3,sns,sqs,lambda,dynamodb,stepfunctions,iam,sts
     healthcheck:

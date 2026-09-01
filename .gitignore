@@ -9,9 +9,13 @@ target/
 *.class
 .env
 .DS_Store
-src/gate/gate
-src/gateway/gateway
+src/ingestion/gate/gate
+src/ingestion/gateway/gateway
 .chroma/
+.coverage
+coverage.xml
+.mypy_cache/
+.ruff_cache/
 
 # Personal interview-prep notes — never pushed
 docs/INTERVIEW_PREP.md

@@ -17,6 +17,7 @@ correctly, but does NOT enforce them on live S3/DynamoDB/Lambda calls
 that uses it. Print statements here are deliberate: this script is meant
 to be read while it runs, not just executed.
 """
+
 from __future__ import annotations
 
 import json
@@ -26,7 +27,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from common import aws  # noqa: E402
+from utils import aws  # noqa: E402
 
 IAM_DIR = ROOT / "iam"
 
@@ -64,7 +65,7 @@ def main() -> None:
     for role_name, (trust_file, policy_file) in ROLES.items():
         arns[role_name] = ensure_role(iam, role_name, trust_file, policy_file)
     print()
-    print("Role ARNs (used by src/statemachine.py):")
+    print("Role ARNs (used by src/orchestration/statemachine.py):")
     print(json.dumps(arns, indent=2))
     print()
     print("Reminder: MiniStack does not enforce these on live calls. Try the")

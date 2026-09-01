@@ -1,0 +1,26 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [".venv", "data", "benchmarks"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.format]
+
+[tool.mypy]
+python_version = "3.12"
+# pyspark/boto3/chromadb don't ship type stubs — this is a deliberate
+# choice to avoid drowning in third-party import errors, not laziness.
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["src.models.*", "src.utils.*"]
+disallow_untyped_defs = true
+
+[tool.coverage.run]
+source = ["src"]
+
+[tool.coverage.report]
+fail_under = 5
+show_missing = true

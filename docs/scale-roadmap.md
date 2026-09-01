@@ -1,6 +1,6 @@
 # Scale roadmap — from "extrapolation breaks before 1 TB" to "code we know scales"
 
-`docs/scale-report.md` measured a real curve up to 10M rows and found the honest limit: a global shuffle-based dedup (`src/curate.py`) projects ~420 GB of shuffle volume at 1 TB, against 50 GB of free disk on this machine — the model breaks down before reaching 1 TB, not just slowly. This document covers the two structural changes that actually close that gap, both implemented and measured, not just proposed.
+`docs/scale-report.md` measured a real curve up to 10M rows and found the honest limit: a global shuffle-based dedup (`src/transformation/curate.py`) projects ~420 GB of shuffle volume at 1 TB, against 50 GB of free disk on this machine — the model breaks down before reaching 1 TB, not just slowly. This document covers the two structural changes that actually close that gap, both implemented and measured, not just proposed.
 
 ---
 
@@ -12,7 +12,7 @@ In Spark's sort-based shuffle, shuffle write goes to local disk (`spark.local.di
 
 ### The fix: dedup against an external store, not against the whole dataset
 
-`curate.py` dedupes by comparing the entire dataset against itself (`Window.partitionBy("idempotency_key")`) — a shuffle whose size grows with total volume. `src/curate_incremental.py` instead processes **bounded batches** and checks each batch's keys against a persistent DynamoDB table (`txn-curated-keys`), the same principle the real-time gate already uses (a conditional write, no shuffle, no need to see the rest of the data).
+`curate.py` dedupes by comparing the entire dataset against itself (`Window.partitionBy("idempotency_key")`) — a shuffle whose size grows with total volume. `src/transformation/curate_incremental.py` instead processes **bounded batches** and checks each batch's keys against a persistent DynamoDB table (`txn-curated-keys`), the same principle the real-time gate already uses (a conditional write, no shuffle, no need to see the rest of the data).
 
 Design:
 1. Intra-batch dedup — same window pattern as `curate.py`, scoped to one batch (bounded shuffle).
@@ -80,10 +80,10 @@ The curation-layer fix above doesn't touch the actual ceiling. Measured this ses
 
 ### What changed, and why in this order
 
-1. **`bench_gate_saturation_curve()`** (`src/bench.py`) — the missing measurement. A concurrent client pool at 1/8/16/32/64 workers, reporting throughput and latency at each level. This has to come first: optimizing against a serial-caller number would have been optimizing against the wrong baseline.
+1. **`bench_gate_saturation_curve()`** (`scripts/bench.py`) — the missing measurement. A concurrent client pool at 1/8/16/32/64 workers, reporting throughput and latency at each level. This has to come first: optimizing against a serial-caller number would have been optimizing against the wrong baseline.
 2. **Metrics off the request path.** Every `/accept` call did 2-3 synchronous DynamoDB round-trips: one conditional `PutItem` (the real work) plus 1-2 `UpdateItem` calls just to increment counters. The counter accounting cost as much as the actual write. Fixed with `sync/atomic` counters and a periodic (2s) flush to `txn-gate-metrics` in a background goroutine — verified live: metrics correctly accumulate and land in DynamoDB on the flush tick, and a failed flush re-adds its delta instead of losing it.
 3. **A bounded LRU cache of recently-accepted keys.** These synthetic retries arrive clustered in time (`data_gen.py` injects them 1-30s after the original). A cache hit answers 409 without touching DynamoDB at all — and it is safe by construction: a key only enters the cache *after* a successful `PutItem`, so a hit always means "this really was written before." A miss (including anything evicted) always falls through to the real conditional write; eviction can cost an extra DynamoDB call, never cause an incorrect accept.
-4. **`POST /accept/batch`.** `BatchGetItem` (100/call) then `BatchWriteItem` (25/call) — round-trips per event drop from 1 to ~0.05. `BatchWriteItem` has no `ConditionExpression`, so this is two-phase, at-least-once, with an explicit race window (two concurrent batch requests containing the same brand-new key could both see it absent and both write it). `/accept` is unchanged and keeps the exact-one-winner guarantee — `tests/test_chaos.py::test_concurrent_duplicate_requests_only_one_wins` still exercises it directly. Found and fixed one real bug building this: `BatchGetItem` rejects a request containing duplicate keys (real AWS behavior) — a batch with a within-request duplicate (a realistic case for a batch endpoint) failed with a 500 until the query keys were deduplicated separately from the per-event duplicate-marking logic.
+4. **`POST /accept/batch`.** `BatchGetItem` (100/call) then `BatchWriteItem` (25/call) — round-trips per event drop from 1 to ~0.05. `BatchWriteItem` has no `ConditionExpression`, so this is two-phase, at-least-once, with an explicit race window (two concurrent batch requests containing the same brand-new key could both see it absent and both write it). `/accept` is unchanged and keeps the exact-one-winner guarantee — `tests/integration/test_chaos.py::test_concurrent_duplicate_requests_only_one_wins` still exercises it directly. Found and fixed one real bug building this: `BatchGetItem` rejects a request containing duplicate keys (real AWS behavior) — a batch with a within-request duplicate (a realistic case for a batch endpoint) failed with a 500 until the query keys were deduplicated separately from the per-event duplicate-marking logic.
 
 ### What this does and doesn't claim
 

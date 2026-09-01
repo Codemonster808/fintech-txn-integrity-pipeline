@@ -3,7 +3,7 @@
 # Frees the port first so a leftover demo cannot block the next one.
 #
 # Usage:
-#   scripts/run_with_bg.sh 8080 "GIN_MODE=release src/gate/gate" -- cmd...
+#   scripts/run_with_bg.sh 8080 "GIN_MODE=release src/ingestion/gate/gate" -- cmd...
 set -euo pipefail
 
 if [[ $# -lt 4 ]]; then

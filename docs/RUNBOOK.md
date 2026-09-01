@@ -32,7 +32,7 @@ Un repo a la vez. `docker compose down` antes de abrir otro (RAM).
 ### 1.1 Generar eventos (con retries deliberados)
 
 ```bash
-python3 src/data_gen.py --out data/events.jsonl --count 200 --retry-rate 0.08 --seed 42
+python3 src/ingestion/data_gen.py --out data/events.jsonl --count 200 --retry-rate 0.08 --seed 42
 wc -l data/events.jsonl
 python3 -c "import json; ks=[json.loads(l)['idempotency_key'] for l in open('data/events.jsonl')]; print(len(ks), 'lines', len(set(ks)), 'unique keys')"
 ```
@@ -42,8 +42,8 @@ python3 -c "import json; ks=[json.loads(l)['idempotency_key'] for l in open('dat
 ### 1.2 Publicar a SNS (todavía no hay nada en S3)
 
 ```bash
-cd src/gate && go build ./... && cd ../..
-python3 src/publisher.py --in data/events.jsonl
+cd src/ingestion/gate && go build ./... && cd ../..
+python3 src/ingestion/publisher.py --in data/events.jsonl
 python3 scripts/aws_inspect.py sqs
 python3 scripts/aws_inspect.py s3
 ```
@@ -58,7 +58,7 @@ El gate **no** puede quedar colgado en background. En dos terminales:
 
 ```bash
 source env.sh
-GIN_MODE=release src/gate/gate
+GIN_MODE=release src/ingestion/gate/gate
 # /health en :8080
 ```
 
@@ -67,7 +67,7 @@ GIN_MODE=release src/gate/gate
 ```bash
 source env.sh
 curl -s http://localhost:8080/health
-python3 src/consumer.py --idle-timeout 10
+python3 src/ingestion/consumer.py --idle-timeout 10
 python3 scripts/aws_inspect.py s3
 python3 scripts/aws_inspect.py ddb
 python3 scripts/aws_inspect.py sqs
@@ -79,25 +79,25 @@ python3 scripts/aws_inspect.py sqs
 - `txn-gate-metrics` — contador de duplicados (no se infiere de DDB: un PutItem condicional fallido no deja rastro)
 - SQS visible ≈ 0
 
-Cuando termines de explorar, `Ctrl+C` en Terminal A.  
+Cuando termines de explorar, `Ctrl+C` en Terminal A.
 Atajo que sí limpia el proceso: `make demo` (usa `scripts/run_with_bg.sh`).
 
 ### 1.4 Step Functions + curación Spark
 
 ```bash
-python3 src/statemachine.py
+python3 src/orchestration/statemachine.py
 python3 scripts/aws_inspect.py sfn
-python3 src/curate.py          # Parquet en txn-curated
+python3 src/transformation/curate.py          # Parquet en txn-curated
 make query                     # DuckDB (stand-in de Redshift)
 ```
 
 ### 1.5 Outbox: publicar el evento de finalización
 
-`src/statemachine.py` ya dejó un evento `CurationCompleted` en `PENDING` dentro de `txn-outbox` (lo escribe `record_status.py` en la misma transacción DynamoDB que la fila de status — ver su docstring). Nadie lo publicó a SNS todavía:
+`src/orchestration/statemachine.py` ya dejó un evento `CurationCompleted` en `PENDING` dentro de `txn-outbox` (lo escribe `record_status.py` en la misma transacción DynamoDB que la fila de status — ver su docstring). Nadie lo publicó a SNS todavía:
 
 ```bash
 aws dynamodb scan --table-name txn-outbox --query 'Items[*].[event_id.S,status.S]' --output text
-make outbox                    # o: python3 src/outbox_publisher.py
+make outbox                    # o: python3 src/orchestration/outbox_publisher.py
 aws dynamodb scan --table-name txn-outbox --query 'Items[*].[event_id.S,status.S]' --output text
 ```
 
@@ -135,7 +135,7 @@ SM_ARN=$(aws stepfunctions list-state-machines --query "stateMachines[0].stateMa
 EXEC_ARN=$(aws stepfunctions list-executions --state-machine-arn "$SM_ARN" --max-results 1 --query "executions[0].executionArn" --output text)
 aws stepfunctions get-execution-history --execution-arn "$EXEC_ARN"
 
-# Lambda — estado real de las funciones que despliega src/statemachine.py
+# Lambda — estado real de las funciones que despliega src/orchestration/statemachine.py
 aws lambda get-function --function-name txn-preflight --query 'Configuration.[State,Runtime,LastModified]'
 aws lambda invoke --function-name txn-preflight --payload '{}' /tmp/out.json && cat /tmp/out.json
 
@@ -169,7 +169,7 @@ Esperado: `200` luego `409`. El segundo no escribe otro objeto en S3.
 
 ### Sin `env.sh`
 
-Abre una terminal **nueva** (sin `source env.sh`) y corre `python3 src/publisher.py --in data/events.jsonl`.  
+Abre una terminal **nueva** (sin `source env.sh`) y corre `python3 src/ingestion/publisher.py --in data/events.jsonl`.
 Esperado: timeout, credenciales, o `QueueDoesNotExist`. Ese es el Problema 1 del handoff.
 
 ---
@@ -207,7 +207,7 @@ El mensaje aparece en **ambas** `txn-validation-queue` y `txn-audit-queue` (`aws
 
 **3. Reconstruye qué pasó en una ejecución de Step Functions solo con el CLI**
 
-Corre `python3 src/statemachine.py`, luego usa **solo** `aws stepfunctions list-executions` y `get-execution-history` (sección 2) — sin mirar `src/statemachine.py` ni `asl/*.json`.
+Corre `python3 src/orchestration/statemachine.py`, luego usa **solo** `aws stepfunctions list-executions` y `get-execution-history` (sección 2) — sin mirar `src/orchestration/statemachine.py` ni `asl/*.json`.
 
 <details><summary>Verificar</summary>
 
@@ -225,7 +225,7 @@ Después de `make demo`, usa solo `aws s3api list-objects-v2 --bucket txn-raw --
 
 **5. Quita un permiso de verdad, valídalo con `simulate-principal-policy`, arréglalo**
 
-`src/statemachine.py` ya crea 3 roles reales con políticas de mínimo privilegio (`scripts/iam_setup.py`, `iam/*.json`) — pero MiniStack **no aplica enforcement** en las llamadas reales (un rol con `Deny *` explícito igual podría hacer `s3 ls`; verificado). Lo que sí evalúa políticas de verdad es `iam simulate-principal-policy` — así es como validarías una política *antes* de desplegarla en un trabajo real.
+`src/orchestration/statemachine.py` ya crea 3 roles reales con políticas de mínimo privilegio (`scripts/iam_setup.py`, `iam/*.json`) — pero MiniStack **no aplica enforcement** en las llamadas reales (un rol con `Deny *` explícito igual podría hacer `s3 ls`; verificado). Lo que sí evalúa políticas de verdad es `iam simulate-principal-policy` — así es como validarías una política *antes* de desplegarla en un trabajo real.
 
 ```bash
 # 1. Confirma el estado actual: allowed
@@ -260,7 +260,7 @@ Paso 1 y 4: `EvalDecision: allowed`. Paso 3: `EvalDecision: implicitDeny` — si
 
 **6. Demuestra por qué el outbox existe: simula un evento "perdido" y recupéralo**
 
-Corre `python3 src/statemachine.py` dos veces seguidas (dos `job_id` distintos, dos eventos `PENDING` nuevos en `txn-outbox`) **sin** correr `make outbox` entre medio. Luego corre `make outbox` una sola vez.
+Corre `python3 src/orchestration/statemachine.py` dos veces seguidas (dos `job_id` distintos, dos eventos `PENDING` nuevos en `txn-outbox`) **sin** correr `make outbox` entre medio. Luego corre `make outbox` una sola vez.
 
 <details><summary>Verificar</summary>
 
