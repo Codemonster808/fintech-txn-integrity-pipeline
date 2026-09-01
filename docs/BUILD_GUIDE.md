@@ -27,7 +27,7 @@ Get MiniStack working:
 
 ```bash
 docker compose up -d
-curl http://localhost:4566/_health   # expected: {"services": {...}} with no errors
+curl http://localhost:4581/_health   # expected: {"services": {...}} with no errors
 ```
 
 If the health check fails, check `docker compose logs ministack` — the most common cause is Docker Desktop's context still being active (`docker context use default` fixes it).
@@ -45,7 +45,7 @@ make check-env   # should print: "OK: services reachable"
 **Troubleshooting**
 - Port 4566 already in use → another MiniStack/LocalStack instance is running; `docker ps` and stop it.
 - `check-env` times out → MiniStack takes a couple seconds to boot (much faster than LocalStack); wait and retry.
-- boto3 calls hang or hit real AWS → confirm `AWS_ENDPOINT_URL=http://localhost:4566` is set (see `.env` / `utils/aws.py`).
+- boto3 calls hang or hit real AWS → confirm `AWS_ENDPOINT_URL=http://localhost:4581` is set (see `.env` / `utils/aws.py`).
 
 ## 2. Generate synthetic data (1-2 h) → checkpoint: `make check-data`
 

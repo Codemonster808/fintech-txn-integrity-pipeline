@@ -13,11 +13,11 @@ cd /home/lesaint/Documentos/life_plans/fintech-txn-integrity-pipeline
 source env.sh
 ```
 
-Debes ver `AWS_ENDPOINT_URL = http://localhost:4566`. Si no lo ves, los errores más adelante (`QueueDoesNotExist`, `ResourceNotFoundException`) **no** significan que falte el recurso: significan que boto3 está pegándole a AWS real (o a ningún emulador).
+Debes ver `AWS_ENDPOINT_URL = http://localhost:4581`. Si no lo ves, los errores más adelante (`QueueDoesNotExist`, `ResourceNotFoundException`) **no** significan que falte el recurso: significan que boto3 está pegándole a AWS real (o a ningún emulador).
 
 ```bash
 docker compose up -d
-curl -s http://localhost:4566/health
+curl -s http://localhost:4581/health
 make check-env
 python3 scripts/bootstrap.py
 python3 scripts/aws_inspect.py all     # vacío todavía: buckets 0, colas 0
