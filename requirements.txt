@@ -10,7 +10,7 @@ click==8.5.0
 coverage==7.16.0
 duckdb==1.5.5
 fastapi==0.141.1
-gherkin-official==29.0.0
+gherkin-official==42.0.1
 h11==0.16.0
 idna==3.19
 iniconfig==2.3.0
