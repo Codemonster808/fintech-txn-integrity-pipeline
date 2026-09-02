@@ -149,6 +149,16 @@ pytest tests/integration/test_idempotency.py
 make query
 ```
 
+## Testing
+
+```bash
+make test                     # unit + integration + BDD (pytest-bdd), against real MiniStack
+make e2e                      # full pipeline, emits benchmarks/quality-report.json
+.venv/bin/pre-commit run --all-files   # ruff, mypy, whitespace/EOF checks
+```
+
+CI (`.github/workflows/ci.yml`) runs the same suite on every push, plus an isolated `security` job (`pip-audit`, `gosec`) and a coverage gate that fails the build under the threshold on the badge above — measured from a real run, not invented (see `docs/quality-report.md`).
+
 ## Learn by running
 
 See [`docs/RUNBOOK.md`](docs/RUNBOOK.md) (step-by-step + what to inspect + what to break). Build from scratch: [`docs/BUILD_GUIDE.md`](docs/BUILD_GUIDE.md).
@@ -160,3 +170,11 @@ Not a "Kafka word count" with AWS bolted on. Not a happy-path ETL — failure mo
 ## Build it yourself
 
 See [`docs/BUILD_GUIDE.md`](docs/BUILD_GUIDE.md) for a step-by-step build guide, written so it's followable without prior AWS/Spark experience.
+
+## Contributing
+
+Solo-maintained portfolio/demo repo — not actively seeking external contributions, but issues and questions are welcome via [GitHub Issues](https://github.com/Codemonster808/fintech-txn-integrity-pipeline/issues). See [`CODEOWNERS`](CODEOWNERS) and [`SECURITY.md`](SECURITY.md) for how reports are handled.
+
+## License
+
+[MIT](LICENSE) © Codemonster808
