@@ -129,10 +129,20 @@ All AWS access goes through `boto3` with `endpoint_url` set via `AWS_ENDPOINT_UR
 3. **Small-file compaction**: measured trade-off between file size and PUT/GET request count, with before/after Redshift query time.
 4. **Transactional outbox**: `record_status.py` commits the job-status row and a `PENDING` outbox row in one `transact_write_items` call — the business fact and the not-yet-published `CurationCompleted` event succeed or fail together. `src/orchestration/outbox_publisher.py` is a separate, idempotent, safe-to-re-run process that actually publishes to SNS — publishing inline inside the Lambda would reintroduce the exact failure mode (a lost event after a committed write) the pattern exists to prevent. See `docs/RUNBOOK.md` §1.5 and §5.
 
-## Demo (3 minutes)
+## Installation
+
+```bash
+git clone https://github.com/Codemonster808/fintech-txn-integrity-pipeline.git
+cd fintech-txn-integrity-pipeline
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt   # app deps + lint/type/security tooling
+```
+
+## Usage — Demo (3 minutes)
 
 ```bash
 source env.sh
+docker compose up -d   # starts MiniStack on :4581 (local AWS emulator)
 make demo        # 200 events — learn / iterate (see docs/RUNBOOK.md)
 make demo-full   # 100k events — regenerates README-scale metrics (~1h)
 pytest tests/integration/test_idempotency.py
