@@ -16,41 +16,22 @@ import time
 import uuid
 from pathlib import Path
 
-import pytest
-import requests
-
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from utils import aws  # noqa: E402
 from utils.quality import Dimension, QualityReport  # noqa: E402
 
+# `gate_process` is injected by the repo-root conftest.py, not redefined here
+# — this module used to hardcode its own copy (env={"GIN_MODE": "release"},
+# which replaces rather than extends the subprocess environment, silently
+# dropping AWS_ENDPOINT_URL and falling back to the gate's built-in default).
+# That's exactly the bug conftest.py's version was written to fix; this file
+# just hadn't been switched over to it yet.
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
-GATE_URL = "http://localhost:8080"
-GATE_BIN = REPO_ROOT / "src" / "ingestion" / "gate" / "gate"
 N_EVENTS = 1000
 RETRY_RATE = 0.08
-
-
-@pytest.fixture(scope="module")
-def gate_process():
-    if not GATE_BIN.exists():
-        pytest.skip(
-            "gate binary not built — run `cd src/ingestion/gate && go build ./...` "
-            f"first ({GATE_BIN})"
-        )
-    proc = subprocess.Popen([str(GATE_BIN)], env={"GIN_MODE": "release"})
-    for _ in range(20):
-        try:
-            if requests.get(f"{GATE_URL}/health", timeout=1).status_code == 200:
-                break
-        except requests.ConnectionError:
-            time.sleep(0.25)
-    else:
-        proc.terminate()
-        pytest.fail("gate did not become healthy in time")
-    yield proc
-    proc.terminate()
-    proc.wait(timeout=5)
 
 
 def _clear_bucket_prefix(s3, bucket: str, prefix: str) -> None:

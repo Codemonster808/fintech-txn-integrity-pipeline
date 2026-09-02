@@ -1,6 +1,6 @@
 {
   "pipeline": "fintech-txn-integrity-pipeline",
-  "generated_at": "2026-08-31T23:17:15.327175+00:00",
+  "generated_at": "2026-09-02T17:00:40.993190+00:00",
   "score": {
     "completeness": 1.0,
     "correctness": 1.0,
@@ -53,7 +53,7 @@
     {
       "dimension": "timeliness",
       "name": "daily_job_under_sla",
-      "measured": 53.1,
+      "measured": 68.9,
       "threshold": 120.0,
       "passed": true,
       "detail": "preflight + curate + postflight wall time"
@@ -61,7 +61,7 @@
     {
       "dimension": "timeliness",
       "name": "consumer_throughput_under_sla",
-      "measured": 30.0,
+      "measured": 29.8,
       "threshold": 45.0,
       "passed": true,
       "detail": "1000 events through gate+validator"
