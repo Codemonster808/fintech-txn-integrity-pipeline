@@ -21,24 +21,24 @@ Exactly-once transaction ingestion pipeline for payment platforms, built to run 
 ## Architecture
 
 ```
-  data_gen.py  -->  events.jsonl (~8% retries)
+  src/ingestion/data_gen.py  -->  events.jsonl (~8% retries)
         |
         v
-  publisher.py -->  SNS txn-events
+  src/ingestion/publisher.py -->  SNS txn-events
                       |
            +----------+-----------+
            v                      v
   SQS validation           SQS audit --> DLQ
            |
            v
-  consumer.py ----POST /accept---->  Go gate :8080
+  src/ingestion/consumer.py --POST /accept--> src/ingestion/gate (Go) :8080
                                         |
                           DynamoDB PutItem (idempotency_key)
                                         |
                               200 OK         409 duplicate
                                 |                  |
                                 v                  v
-                         validator            ACK, no S3 write
+                    src/models/validator.py   ACK, no S3 write
                            |      |
                         valid   invalid
                            |      |
@@ -46,13 +46,13 @@ Exactly-once transaction ingestion pipeline for payment platforms, built to run 
                       S3 txn-raw   S3 quarantine
                            |
                            v
-                    Step Functions (preflight -> Spark driver -> postflight)
+    Step Functions (src/orchestration/lambdas/preflight.py -> Spark driver -> record_status.py)
                            |
                            v
-                    curate.py (PySpark compact) --> S3 txn-curated Parquet
+       src/transformation/curate.py (PySpark compact) --> S3 txn-curated Parquet
                            |
                            v
-                    DuckDB / Redshift COPY --> FastAPI /txn /metrics
+    src/utils/warehouse.py (DuckDB/Redshift) --> src/serving/api.py /txn /metrics
 ```
 
 Hot path = gate (ms). Batch = Spark compaction (daily).

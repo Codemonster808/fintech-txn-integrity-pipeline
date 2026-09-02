@@ -13,10 +13,10 @@ En local, MiniStack emula SNS/SQS/S3/DynamoDB/Lambda/Step Functions en `:4566`. 
   env.sh  +  docker compose (MiniStack :4566)  +  bootstrap.py
        |         buckets / queues / topic / DDB tables
        v
-  data_gen.py ---------> data/events.jsonl
+  src/ingestion/data_gen.py ---------> data/events.jsonl
        |                   (N lines, ~8% retries = same idempotency_key)
        v
-  publisher.py --------> SNS  txn-events
+  src/ingestion/publisher.py --------> SNS  txn-events
                             |  fan-out (raw delivery)
               +-------------+-------------+
               v                           v
@@ -24,11 +24,11 @@ En local, MiniStack emula SNS/SQS/S3/DynamoDB/Lambda/Step Functions en `:4566`. 
               |                           |
               |                           +--> DLQ txn-audit-dlq
               v                              (after maxReceiveCount)
-   consumer.py  (poll)
+   src/ingestion/consumer.py  (poll)
               |
               |  POST /accept
               v
-   Go/Gin gate :8080
+   src/ingestion/gate (Go/Gin) :8080
               |
               |  DynamoDB PutItem
               |  Condition: attribute_not_exists(idempotency_key)
@@ -39,7 +39,7 @@ En local, MiniStack emula SNS/SQS/S3/DynamoDB/Lambda/Step Functions en `:4566`. 
          |         |
          |         +--> ACK SQS, no S3 write
          v
-   validator.handler
+   src/models/validator.py :: handler
          |
     +----+----+
     |         |
@@ -50,19 +50,19 @@ En local, MiniStack emula SNS/SQS/S3/DynamoDB/Lambda/Step Functions en `:4566`. 
   /valid/        (schema fail; parked for replay)
     |
     v
-  statemachine.py
-    |  Step Functions: preflight Lambda -> (driver runs Spark) -> postflight Lambda
+  src/orchestration/statemachine.py
+    |  Step Functions: preflight.py Lambda -> (driver runs Spark) -> record_status.py Lambda
     v
-  curate.py (PySpark)
+  src/transformation/curate.py (PySpark)
     |  compact small JSON -> Parquet
     v
  S3 txn-curated / txn_events/
     |
     v
-  DuckDB  (stand-in Redshift / Spectrum)
+  src/utils/warehouse.py :: DuckDB  (stand-in Redshift / Spectrum)
     |
     v
-  FastAPI  /txn/{id}  /metrics/dedup  /metrics/sla
+  src/serving/api.py :: FastAPI  /txn/{id}  /metrics/dedup  /metrics/sla
 ```
 
 ## ASCII — un evento (hot path vs batch)
