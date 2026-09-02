@@ -1,0 +1,11 @@
+# Dev/CI-only tooling — not part of the app's runtime dependency graph.
+# -c pins these against requirements.txt's already-resolved versions so the
+# two files never disagree on a shared transitive dependency.
+# Regenerate with:
+#   .venv/bin/pip-compile requirements-dev.in --output-file requirements-dev.txt
+-c requirements.txt
+mypy
+pip-audit
+pip-tools
+pre-commit
+ruff

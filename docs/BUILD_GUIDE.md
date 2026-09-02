@@ -20,7 +20,7 @@ docker --version        # need 24+ (native Docker Engine, not Docker Desktop)
 python3 --version       # need 3.12+
 go version               # need 1.21+
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # app deps + lint/type/security tooling
 ```
 
 Get MiniStack working:

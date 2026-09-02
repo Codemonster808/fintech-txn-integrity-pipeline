@@ -59,6 +59,17 @@ There is no `make build-worker`/`make catalog`/`make eval` equivalent in this
 repo — this pipeline has no ECS worker, warehouse catalog job, or LLM eval
 harness; don't invent flags that aren't in the Makefile.
 
+Dependencies: `requirements.in` (direct runtime deps) and `requirements-dev.in`
+(lint/type/security tooling, constrained against `requirements.txt` so the two
+never disagree) are the source of truth — never hand-edit `requirements.txt`
+or `requirements-dev.txt`, they're generated:
+```bash
+.venv/bin/pip-compile requirements.in --output-file requirements.txt
+.venv/bin/pip-compile requirements-dev.in --output-file requirements-dev.txt
+```
+This is also what makes Dependabot's pip PRs resolvable instead of hand-editing
+one pinned line into a conflict with another.
+
 ## 3. Naming conventions
 
 **S3 buckets**: `txn-raw` (valid events, `valid/` prefix; schema registry at

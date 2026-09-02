@@ -1,0 +1,13 @@
+# Direct dependencies only, unpinned — pip-compile resolves this into
+# requirements.txt, including transitive constraints (e.g. boto3's minimum
+# botocore). Never hand-edit requirements.txt; regenerate it instead:
+#   .venv/bin/pip-compile requirements.in --output-file requirements.txt
+boto3
+duckdb
+fastapi
+pyspark
+pytest
+pytest-bdd
+pytest-cov
+requests
+uvicorn
