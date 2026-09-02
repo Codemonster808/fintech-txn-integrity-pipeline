@@ -105,7 +105,7 @@ class BloomFilter:
 def build_spark(app_name: str = "curate-incremental"):
     from pyspark.sql import SparkSession
 
-    endpoint = os.environ.get("AWS_ENDPOINT_URL", "http://localhost:4566")
+    endpoint = os.environ.get("AWS_ENDPOINT_URL", "http://localhost:4581")
     return (
         SparkSession.builder.appName(app_name)
         .master("local[2]")
@@ -196,7 +196,7 @@ def process_batch(
         synthetic_events_df,  # reuses the verified ~8% intra-batch collision generator
     )
 
-    endpoint = os.environ.get("AWS_ENDPOINT_URL", "http://localhost:4566")
+    endpoint = os.environ.get("AWS_ENDPOINT_URL", "http://localhost:4581")
     region = os.environ.get("AWS_REGION", "us-east-1")
     access_key = os.environ.get("AWS_ACCESS_KEY_ID", "test")
     secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY", "test")

@@ -4,11 +4,18 @@ Requires the gate binary built and MiniStack running (same as test_idempotency.p
 """
 
 import concurrent.futures
+import sys
 import time
 import uuid
+from pathlib import Path
 
 import requests
-from test_idempotency import GATE_BIN, GATE_URL, _event, gate_process  # noqa: F401,E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from gate_helpers import GATE_URL, _event  # noqa: E402
+
+# `gate_process` is injected by the repo-root conftest.py, not imported.
 
 
 def test_concurrent_duplicate_requests_only_one_wins(gate_process):
@@ -122,7 +129,8 @@ def test_accept_batch_race_window_is_real_not_hypothetical(gate_process):
     # informational, not a hard requirement either way.
     if n_accepted > 1:
         print(
-            f"\n  race window observed this run: {n_accepted}/{n_requests} requests reported 'accepted' "
+            f"\n  race window observed this run: {n_accepted}/{n_requests} requests "
+            f"reported 'accepted' "
             f"for the same new key — this is the documented trade-off, not a bug."
         )
     else:

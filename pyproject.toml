@@ -22,5 +22,5 @@ disallow_untyped_defs = true
 source = ["src"]
 
 [tool.coverage.report]
-fail_under = 5
+fail_under = 22
 show_missing = true

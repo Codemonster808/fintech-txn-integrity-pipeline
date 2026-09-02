@@ -35,7 +35,8 @@ RETRY_RATE = 0.08
 def gate_process():
     if not GATE_BIN.exists():
         pytest.skip(
-            f"gate binary not built — run `cd src/ingestion/gate && go build ./...` first ({GATE_BIN})"
+            "gate binary not built — run `cd src/ingestion/gate && go build ./...` "
+            f"first ({GATE_BIN})"
         )
     proc = subprocess.Popen([str(GATE_BIN)], env={"GIN_MODE": "release"})
     for _ in range(20):
@@ -82,7 +83,7 @@ def test_full_pipeline_quality(gate_process):
         timeout=30,
     )
     assert gen.returncode == 0, gen.stderr
-    events = [json.loads(l) for l in data_path.read_text().splitlines()]
+    events = [json.loads(line) for line in data_path.read_text().splitlines()]
     unique_keys = {e["idempotency_key"] for e in events}
 
     s3 = aws.client("s3")
@@ -144,7 +145,10 @@ def test_full_pipeline_quality(gate_process):
         "no_settled_txn_lost",
         measured=n_raw_valid,
         threshold=len(unique_keys),
-        detail=f"S3 raw valid objects ({n_raw_valid}) vs unique idempotency keys generated ({len(unique_keys)})",
+        detail=(
+            f"S3 raw valid objects ({n_raw_valid}) vs unique idempotency keys "
+            f"generated ({len(unique_keys)})"
+        ),
     )
 
     measured_dup_rate = consume_stats["duplicate_rejected"] / (
@@ -169,14 +173,19 @@ def test_full_pipeline_quality(gate_process):
     )
 
     curate_stats = sm_result.get("curate_stats", {})
-    curate2_line = next(l for l in curate2.stdout.splitlines() if l.startswith("curated: "))
+    curate2_line = next(
+        line for line in curate2.stdout.splitlines() if line.startswith("curated: ")
+    )
     curate2_stats = ast.literal_eval(curate2_line[len("curated: ") :])
     report.check(
         Dimension.CONSISTENCY,
         "curate_reprocess_same_row_count",
         measured=1.0 if curate2_stats.get("rows_out") == curate_stats.get("rows_out") else 0.0,
         threshold=1.0,
-        detail=f"first run rows_out={curate_stats.get('rows_out')}, second run rows_out={curate2_stats.get('rows_out')}",
+        detail=(
+            f"first run rows_out={curate_stats.get('rows_out')}, "
+            f"second run rows_out={curate2_stats.get('rows_out')}"
+        ),
     )
 
     n_quarantine = s3.list_objects_v2(Bucket="txn-quarantine", Prefix="invalid/").get("KeyCount", 0)

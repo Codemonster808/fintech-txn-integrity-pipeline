@@ -53,7 +53,7 @@ GATE_RESULTS_PATH = Path(__file__).resolve().parents[1] / "benchmarks" / "result
 def build_spark(app_name: str = "scale-bench"):
     from pyspark.sql import SparkSession
 
-    endpoint = os.environ.get("AWS_ENDPOINT_URL", "http://localhost:4566")
+    endpoint = os.environ.get("AWS_ENDPOINT_URL", "http://localhost:4581")
     return (
         SparkSession.builder.appName(app_name)
         .master("local[2]")
@@ -328,10 +328,11 @@ def extrapolate_to_1tb(materialized_results: list[dict]) -> dict:
         "model_breaks_down": projected_shuffle_write_at_1tb > FREE_DISK_BYTES,
         "model_breakdown_reason": (
             f"projected shuffle volume at 1 TB ({projected_shuffle_write_at_1tb / 1024**3:.1f} GB) "
-            f"is {projected_shuffle_write_at_1tb / driver_memory_bytes:.0f}x the 2 GB driver memory "
-            f"and exceeds free disk ({FREE_DISK_BYTES / 1024**3:.0f} GB) — at every measured scale "
-            "(up to 10M rows) disk_bytes_spilled was 0 because shuffle data fit in driver memory; "
-            "at 1 TB it would not, forcing spill, and there isn't enough disk for that spill either. "
+            f"is {projected_shuffle_write_at_1tb / driver_memory_bytes:.0f}x the 2 GB driver "
+            f"memory and exceeds free disk ({FREE_DISK_BYTES / 1024**3:.0f} GB) — at every "
+            "measured scale (up to 10M rows) disk_bytes_spilled was 0 because shuffle data fit "
+            "in driver memory; at 1 TB it would not, forcing spill, and there isn't enough disk "
+            "for that spill either. "
             "This is not achievable on this machine at any speed — it would require a distributed "
             "shuffle across multiple nodes, not just more time on one."
             if projected_shuffle_write_at_1tb > FREE_DISK_BYTES
@@ -395,17 +396,18 @@ def write_report(
 
     lines = ["# Scale benchmark — fintech-txn-integrity-pipeline", ""]
     lines.append(
-        f"1 TB of real events ({MEASURED_EVENT_BYTES}-byte events, measured) = **{ONE_TB_ROWS:,} rows**. "
-        f"This machine has {FREE_DISK_BYTES / 1024**3:.0f} GB free disk — a literal 1 TB dedup shuffle does "
-        "not fit here. What follows is measured up to the largest scale that does fit, extrapolated from "
-        "there with explicit assumptions."
+        f"1 TB of real events ({MEASURED_EVENT_BYTES}-byte events, measured) = "
+        f"**{ONE_TB_ROWS:,} rows**. This machine has {FREE_DISK_BYTES / 1024**3:.0f} GB free "
+        "disk — a literal 1 TB dedup shuffle does not fit here. What follows is measured up to "
+        "the largest scale that does fit, extrapolated from there with explicit assumptions."
     )
     if materialized_results:
         lines += [
             "",
             "## Materialized curve (real Parquet, real shuffle)",
             "",
-            "| Rows | Status | Write input (s) | Dedup+write output (s) | Rows/s (dedup phase) | Shuffle spill (disk) |",
+            "| Rows | Status | Write input (s) | Dedup+write output (s) | "
+            "Rows/s (dedup phase) | Shuffle spill (disk) |",
             "|---|---|---|---|---|---|",
         ]
     for r in materialized_results:
@@ -414,7 +416,8 @@ def write_report(
             spill_mb = (spill.get("disk_bytes_spilled") or 0) / 1024**2
             lines.append(
                 f"| {r['scale_rows']:,} | OK | {r['write_input_seconds']} | "
-                f"{r['dedup_and_write_output_seconds']} | {r['rows_per_second_dedup_phase']:,} | {spill_mb:.1f} MB |"
+                f"{r['dedup_and_write_output_seconds']} | "
+                f"{r['rows_per_second_dedup_phase']:,} | {spill_mb:.1f} MB |"
             )
         else:
             lines.append(
@@ -509,9 +512,12 @@ def main() -> None:
     finally:
         spark.stop()
 
-    print(
-        f"\nwrote {args.json_out if args.mode == 'materialized' else args.json_out.replace('.json', '-logical.json')}"
+    written_path = (
+        args.json_out
+        if args.mode == "materialized"
+        else args.json_out.replace(".json", "-logical.json")
     )
+    print(f"\nwrote {written_path}")
 
 
 if __name__ == "__main__":

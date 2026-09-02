@@ -159,7 +159,7 @@ def run_daily_job() -> dict:
 
     # curate.py prints "curated: {...}" — parse the stats dict back out.
     stats_line = next(
-        (l for l in curate_proc.stdout.splitlines() if l.startswith("curated: ")), None
+        (line for line in curate_proc.stdout.splitlines() if line.startswith("curated: ")), None
     )
     stats = ast.literal_eval(stats_line[len("curated: ") :]) if stats_line else {}
 

@@ -14,7 +14,7 @@ from pyspark.sql.window import Window
 
 
 def build_spark(app_name: str = "txn-curate") -> SparkSession:
-    endpoint = os.environ.get("AWS_ENDPOINT_URL", "http://localhost:4566")
+    endpoint = os.environ.get("AWS_ENDPOINT_URL", "http://localhost:4581")
     return (
         SparkSession.builder.appName(app_name)
         .master("local[2]")

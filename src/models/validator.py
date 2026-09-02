@@ -57,7 +57,8 @@ def validate_event(event: dict, expected_version: int) -> tuple[bool, str]:
     if event.get("schema_version") != expected_version:
         return (
             False,
-            f"schema_version mismatch: got {event.get('schema_version')}, expected {expected_version}",
+            f"schema_version mismatch: got {event.get('schema_version')}, "
+            f"expected {expected_version}",
         )
     if not isinstance(event.get("amount_cents"), int) or event["amount_cents"] <= 0:
         return False, "amount_cents must be a positive integer"

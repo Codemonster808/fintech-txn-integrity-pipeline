@@ -15,7 +15,7 @@ import duckdb
 def connect() -> duckdb.DuckDBPyConnection:
     con = duckdb.connect(database=":memory:")
     con.execute("INSTALL httpfs; LOAD httpfs;")
-    endpoint = os.environ.get("AWS_ENDPOINT_URL", "http://localhost:4566")
+    endpoint = os.environ.get("AWS_ENDPOINT_URL", "http://localhost:4581")
     host = endpoint.replace("http://", "").replace("https://", "")
     con.execute(f"""
         SET s3_endpoint='{host}';

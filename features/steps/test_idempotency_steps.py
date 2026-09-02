@@ -1,10 +1,11 @@
 """BDD steps for idempotency.feature.
 
-Reuses the gate_process fixture and _event()/GATE_URL helpers from
-tests/integration/test_idempotency.py (same fixture test_chaos.py reuses)
+Uses the gate_process fixture (repo-root conftest.py) and the _event()/GATE_URL
+helpers from tests/gate_helpers.py (the same ones test_chaos.py uses)
 against the real Go gate + MiniStack DynamoDB — no new behavior invented
 here, just the already-passing test flows wrapped as Given/When/Then.
 """
+
 import concurrent.futures
 import sys
 import time
@@ -14,11 +15,14 @@ from pathlib import Path
 import requests
 from pytest_bdd import given, parsers, scenarios, then, when
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests" / "integration"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tests"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
-from test_idempotency import GATE_URL, _event, gate_process  # noqa: E402,F401
+from gate_helpers import GATE_URL, _event  # noqa: E402
+
 from utils import aws  # noqa: E402
+
+# `gate_process` is injected by the repo-root conftest.py, not imported.
 
 scenarios("../idempotency.feature")
 
@@ -47,13 +51,17 @@ def brand_new_key(gate_process):
 
 @when("the same idempotency_key is resent")
 def resend_same_key(ctx):
-    ctx["retry_response"] = requests.post(f"{GATE_URL}/accept", json=_event(ctx["key"], "txn-bdd-retry"))
+    ctx["retry_response"] = requests.post(
+        f"{GATE_URL}/accept", json=_event(ctx["key"], "txn-bdd-retry")
+    )
 
 
 @when("a retry with the same key arrives 1 second later")
 def resend_after_delay(ctx):
     time.sleep(1.0)
-    ctx["retry_response"] = requests.post(f"{GATE_URL}/accept", json=_event(ctx["key"], "txn-bdd-late-retry"))
+    ctx["retry_response"] = requests.post(
+        f"{GATE_URL}/accept", json=_event(ctx["key"], "txn-bdd-late-retry")
+    )
 
 
 @when(parsers.parse("{n:d} concurrent requests are sent with that key"))

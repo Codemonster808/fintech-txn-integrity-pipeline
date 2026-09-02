@@ -139,7 +139,8 @@ def main() -> None:
 
     if args.concurrent:
         print(
-            f"\nbenchmarking concurrent saturation curve ({args.concurrent_n_per_level} requests/level)..."
+            f"\nbenchmarking concurrent saturation curve "
+            f"({args.concurrent_n_per_level} requests/level)..."
         )
         curve = bench_gate_saturation_curve(n_per_level=args.concurrent_n_per_level)
         for level in curve:

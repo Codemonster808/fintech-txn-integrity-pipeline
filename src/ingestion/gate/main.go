@@ -156,7 +156,7 @@ func (c *lruCache) Add(key string) {
 func newDynamoClient(ctx context.Context) *dynamodb.Client {
 	endpoint := os.Getenv("AWS_ENDPOINT_URL")
 	if endpoint == "" {
-		endpoint = "http://localhost:4566"
+		endpoint = "http://localhost:4581"
 	}
 	region := os.Getenv("AWS_REGION")
 	if region == "" {

@@ -1,4 +1,5 @@
 """BDD steps for schema-validation.feature — pure validate_event, no S3."""
+
 import sys
 import uuid
 from pathlib import Path

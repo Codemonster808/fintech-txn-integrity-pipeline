@@ -123,7 +123,8 @@ def inspect_lambda() -> None:
             print(f"  {name}: not deployed yet ({e.__class__.__name__})")
             continue
         print(
-            f"  {name}: state={cfg['State']} runtime={cfg['Runtime']} last_modified={cfg['LastModified']}"
+            f"  {name}: state={cfg['State']} runtime={cfg['Runtime']} "
+            f"last_modified={cfg['LastModified']}"
         )
 
 

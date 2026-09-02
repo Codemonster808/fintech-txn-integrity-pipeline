@@ -2,6 +2,7 @@
 
 import random
 import uuid
+from typing import Any
 
 
 def seeded_rng(seed: int = 42) -> random.Random:
@@ -13,8 +14,11 @@ def new_id() -> str:
 
 
 def skewed_choice(
-    rng: random.Random, items: list, hot_fraction: float = 0.05, hot_weight: float = 0.6
-):
+    rng: random.Random,
+    items: list[Any],
+    hot_fraction: float = 0.05,
+    hot_weight: float = 0.6,
+) -> Any:
     """Pick an item from `items` such that `hot_fraction` of items receive `hot_weight` of picks.
 
     Used to simulate the "5% of restaurants generate 60% of orders" pattern.

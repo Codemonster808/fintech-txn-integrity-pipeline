@@ -5,55 +5,18 @@ gate binary built (`cd src/ingestion/gate && go build ./...`) and running on :80
 (see Makefile `check-ingest` target, which drives this same flow).
 """
 
-import os
-import subprocess
-import time
+import sys
 import uuid
 from pathlib import Path
 
-import pytest
 import requests
 
-GATE_URL = "http://localhost:8080"
-GATE_BIN = Path(__file__).resolve().parents[2] / "src" / "ingestion" / "gate" / "gate"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from gate_helpers import GATE_URL, _event  # noqa: E402
 
-@pytest.fixture(scope="module")
-def gate_process():
-    if not GATE_BIN.exists():
-        pytest.skip(
-            f"gate binary not built — run `cd src/ingestion/gate && go build ./...` first ({GATE_BIN})"
-        )
-    # Inherit the full environment (not just GIN_MODE) so AWS_ENDPOINT_URL —
-    # this machine runs MiniStack on 4581, per CLAUDE.md §5 — actually reaches
-    # the gate subprocess. Replacing the env entirely here would silently fall
-    # back to the Go binary's hardcoded localhost:4566 default and talk to
-    # whatever unrelated MiniStack happens to be listening there.
-    proc = subprocess.Popen([str(GATE_BIN)], env={**os.environ, "GIN_MODE": "release"})
-    for _ in range(20):
-        try:
-            if requests.get(f"{GATE_URL}/health", timeout=1).status_code == 200:
-                break
-        except requests.ConnectionError:
-            time.sleep(0.25)
-    else:
-        proc.terminate()
-        pytest.fail("gate did not become healthy in time")
-    yield proc
-    proc.terminate()
-    proc.wait(timeout=5)
-
-
-def _event(idempotency_key: str, txn_id: str) -> dict:
-    return {
-        "txn_id": txn_id,
-        "idempotency_key": idempotency_key,
-        "account_id": "acc_test",
-        "amount_cents": 100,
-        "currency": "USD",
-        "schema_version": 1,
-        "ts": "2026-01-01T00:00:00Z",
-    }
+# The `gate_process` fixture lives in the repo-root conftest.py so both this
+# suite and features/steps/ get it injected by name — see that file for why.
 
 
 def test_first_send_is_accepted(gate_process):

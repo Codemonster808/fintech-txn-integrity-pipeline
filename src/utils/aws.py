@@ -6,14 +6,15 @@ set AWS_ENDPOINT_URL, or unset it entirely to hit real AWS.
 """
 
 import os
+from typing import Any
 
 import boto3
 
-_DEFAULT_ENDPOINT = "http://localhost:4566"
+_DEFAULT_ENDPOINT = "http://localhost:4581"
 _DEFAULT_REGION = "us-east-1"
 
 
-def client(service_name: str):
+def client(service_name: str) -> Any:
     endpoint_url = os.environ.get("AWS_ENDPOINT_URL", _DEFAULT_ENDPOINT) or None
     return boto3.client(
         service_name,
@@ -24,7 +25,7 @@ def client(service_name: str):
     )
 
 
-def resource(service_name: str):
+def resource(service_name: str) -> Any:
     endpoint_url = os.environ.get("AWS_ENDPOINT_URL", _DEFAULT_ENDPOINT) or None
     return boto3.resource(
         service_name,

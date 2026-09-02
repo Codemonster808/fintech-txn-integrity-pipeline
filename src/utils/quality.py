@@ -18,11 +18,11 @@ Usage:
 import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 
-class Dimension(str, Enum):
+class Dimension(StrEnum):
     COMPLETENESS = "completeness"  # did rows get lost between stages?
     CORRECTNESS = "correctness"  # does output match ground truth?
     CONSISTENCY = "consistency"  # does re-running produce the same result?
@@ -116,7 +116,8 @@ class QualityReport:
             "",
             f"Generated: {self.generated_at}",
             "",
-            f"**Overall score: {score['overall']:.0%}** ({sum(c.passed for c in self.checks)}/{len(self.checks)} checks passed)",
+            f"**Overall score: {score['overall']:.0%}** "
+            f"({sum(c.passed for c in self.checks)}/{len(self.checks)} checks passed)",
             "",
             "| Dimension | Score |",
             "|---|---|",
@@ -134,7 +135,8 @@ class QualityReport:
         for c in self.checks:
             status = "PASS" if c.passed else "**FAIL**"
             lines.append(
-                f"| {c.dimension.value} | {c.name} | {c.measured} | {c.threshold} | {status} | {c.detail} |"
+                f"| {c.dimension.value} | {c.name} | {c.measured} | {c.threshold} "
+                f"| {status} | {c.detail} |"
             )
 
         out = Path(path)
